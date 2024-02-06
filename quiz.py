@@ -12,7 +12,7 @@ Usage:
   ./quiz.py practice [--amount=<amount>] [--mode=<mode>]
   ./quiz.py stats [--id=<id>|--user=<username>] [--status=<status> --type=<type>]
   ./quiz.py profile [<username>|--user=<username>|--add-user=<username>|--remove-user=<username>]
-  ./quiz.py question [--stats|--enabled|--remove|--update|--reset] <id>
+  ./quiz.py question [--stats|--active|--remove|--update|--reset] <id>
   ./quiz.py question [--reset-all|--add|]
 
 Commands:
@@ -64,10 +64,10 @@ class Data:
                 row['times_shown'] = int(row['times_shown'])
                 row['correct'] = int(row['correct'])
 
-                if row['enabled'] == "True":
-                    row['enabled'] = True
+                if row['active'] == "True":
+                    row['active'] = True
                 else:
-                    row['enabled'] = False
+                    row['active'] = False
 
     def save(self):
         with open(self.filename, 'w') as file:
@@ -104,19 +104,19 @@ class Question:
                 index = i
         return index
 
-    def _filter_columns(self, enabled=True, choices=True):
+    def _filter_columns(self, active=True, choices=True):
         '''
         Choose which questions should be shown:
             with or without choices;
-            enabled or disabled.
+            active or inactive.
         '''
         enabled_db = []
 
         # for row in self.db:
         for row in self.db:
-            if enabled and row['enabled']:
+            if active and row['active']:
                 enabled_db.append(row)
-            elif enabled is False and row['enabled'] is False:
+            elif active is False and row['active'] is False:
                 enabled_db.append(row)
 
         choices_db = []
@@ -151,7 +151,7 @@ class Question:
         new_rows = []
 
         for row in rows:
-            if row['enabled']:
+            if row['active']:
                 if mode == 'mixed':
                     new_rows = rows
                 elif mode == 'typing':
@@ -294,7 +294,7 @@ class Question:
         qu_index = self._get_question_index()
         row = self.db[qu_index]
 
-        row['enabled'] = True
+        row['active'] = True
         row['times_shown'] = 0
         row['correct'] = 0
 
@@ -315,7 +315,7 @@ class Question:
     def toggle_status(self) -> str:
         qu_index = self._get_question_index()
         row = self.db[qu_index]
-        row['enabled'] = not row['enabled']
+        row['active'] = not row['active']
 
         self.data.save()
         return self._tabulate_data([row])
@@ -389,7 +389,7 @@ def main():
     # Questions manipulation
     if args['question']:
         if args['<id>']:
-            if args['--enabled']:
+            if args['--active']:
                 print(q.toggle_status())
             elif args['--update']:
                 print(q.update())
@@ -428,7 +428,6 @@ TODO:
 6. Implement question --disable=1; --disable=1,2,4,6; --disable=1-20
 7. Fix that adding new  questions there wouldn't be spaces between answer,question,etc
 8. Use python standard log library to output text to console?
-9. change 'enabled' to 'active'
 12. Fix choosing mode doesn't accept letter A,B,etc as answer (correct)
 13. Dont allow empty answers in 'typing' mode
 14. Only allow to choose existing LETTERS: or better only accept existing(printed letters)
