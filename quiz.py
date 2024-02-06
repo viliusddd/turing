@@ -181,7 +181,7 @@ class Question:
         self._user_input(rows, amount)
 
     def _choosing_input(self, row):
-        abc = ['A', 'B', 'C', 'D']
+        abc = ['A', 'B', 'C', 'D', 'E', 'F']
 
         choices = row['choices'].split(', ')
         choices.append(row['answer'])
@@ -194,7 +194,7 @@ class Question:
 
         while True:
             user_answer = input('Choose letter: ')
-            if user_answer.upper() in abc:
+            if user_answer.upper() in abc[:len(choices)]:
                 user_answer = user_answer.upper()
                 break
 
@@ -430,5 +430,4 @@ TODO:
 8. Use python standard log library to output text to console?
 12. Fix choosing mode doesn't accept letter A,B,etc as answer (correct)
 13. Dont allow empty answers in 'typing' mode
-14. Only allow to choose existing LETTERS: or better only accept existing(printed letters)
 """
