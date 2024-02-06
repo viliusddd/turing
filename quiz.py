@@ -177,6 +177,20 @@ class Question:
 
         return new_rows
 
+    def weighted_choices(self, rows):
+        weights = []
+        for row in rows:
+            if row['correct'] == 0:
+                weights.append(9.9)
+            else:
+                weight = round(10 - (row['correct'] / row['times_shown'] * 10), 1)
+                if weight == 0:
+                    weight = 0.5
+                weights.append(weight)
+
+        rows = random.choices(rows, weights=weights, k=(int(len(rows))))
+        return(rows)
+
     def practice(self, answer_mode='mixed'):
         rows = self._filter_by_mode(mode=answer_mode)
         rows = random.sample(rows, len(rows))
@@ -207,7 +221,8 @@ class Question:
     def _choosing_input(self, row):
         abc = ['A', 'B', 'C', 'D', 'E', 'F']
 
-        choices = row['choices'].split(', ')
+        choices = row['choices'].split(',')
+        choices = [ch.strip() for ch in choices]
         choices.append(row['answer'])
 
         random.shuffle(choices)
@@ -229,6 +244,8 @@ class Question:
         try:
             num = 1
             while True:
+                if not limited:
+                    self.weighted_choices(rows)
                 for row in rows:
                     print(f'{num}. {row["question"]}')
 
@@ -488,7 +505,6 @@ TODO:
 1. Add -v switch
 3. Add confirmation dialog, e.g. do you really want to reset all questions? yN
 4. Create class Question with __iter__ method https://dev.to/htv2012/how-to-write-a-class-object-to-csv-5be1
-7. Fix that adding new  questions there wouldn't be spaces between answer,question,etc
 8. Use python standard log library to output text to console?
 9. Fix question ids 5,9 breaking grid print. Question, choices, answer
    columns should increase in height for those lines.
