@@ -12,8 +12,8 @@ Usage:
   ./quiz.py practice [--amount=<amount>] [--mode=<mode>]
   ./quiz.py stats [--id=<id>|--user=<username>] [--status=<status> --type=<type>]
   ./quiz.py profile [<username>|--user=<username>|--add-user=<username>|--remove-user=<username>]
-  ./quiz.py question [--stats|--active|--remove|--update|--reset] <id>
-  ./quiz.py question [--reset-all|--add|]
+  ./quiz.py question [--stats|--toggle-status|--enable|--disable|--update|--remove|--reset] <id>
+  ./quiz.py question [--reset-all|--add]
 
 Commands:
   test              Test mode
@@ -35,7 +35,6 @@ Options:
   --type            Choose to show free-form or multi-choice questions
   -v --verbose      Print verbose output to terminal: Print explanations
   -vv               Print very verbose output to terminal: print explanations and output tables
-  --add             Add question
   --reset-all       Reset all questions numbers
 '''
 import csv
@@ -83,8 +82,8 @@ class Data:
 
 
 class Question:
-    def __init__(self, qid, filename):
-        self.qid = qid or None
+    def __init__(self, qids, filename):
+        self.qids = qids or None
         self.data = Data(filename)
         self.db = self.data.db
 
@@ -97,12 +96,28 @@ class Question:
         )
         return table
 
-    def _get_question_index(self) -> int:
-        index = 0
-        for i, row in enumerate(self.db):
-            if row['_id'] == int(self.qid):
-                index = i
-        return index
+    def _split_question_ids(self) -> list:
+        if self.qids.isdigit():
+            qids = [int(self.qids)]
+        elif ',' in self.qids:
+            qids = self.qids.split(',')
+            qids = [int(qid) for qid in qids]
+        elif '-' in self.qids:
+            qid1, qid2 = self.qids.split('-')
+            qids = list(range(int(qid1), int(qid2) + 1))
+        else:
+            raise ValueError('Wrong question id or or ids range.')
+        return qids
+
+    def _get_questions_index(self) -> list:
+        qids = self._split_question_ids()
+
+        indexes = []
+        for qid in qids:
+            for i, row in enumerate(self.db):
+                if qid == row['_id']:
+                    indexes.append(i)
+        return indexes
 
     def _filter_columns(self, active=True, choices=True):
         '''
@@ -202,7 +217,7 @@ class Question:
             user_letter = input('Choose letter: ')
 
             if user_letter.upper() in abc[:len(choices)]:
-                return choices[user_letter]
+                return choices[user_letter.upper()]
 
     def _user_input(self, rows, amount):
         user_stats = {'correct': 0, 'total': 0, 'duration': ''}
@@ -244,27 +259,8 @@ class Question:
               f'Test took {duration}'
 
         print(msg)
-        # return
 
-    def _filter_practice_questions(self):
-        ...
-
-    def _type(self):
-        for i, row in enumerate(self.db):
-            print('-' * 80)
-            print(f'{i + 1}. {row["question"]}')
-            user_answer = input('Your answer: ')
-            if user_answer == row['answer']:
-                print('Success! Your answer is correct!')
-                row['correct'] += 1
-                row['times_shown'] += 1
-            else:
-                print(f'You are wrong. Correct answer: {row["answer"]}')
-                row['times_shown'] += 1
-
-        self.data.save()
-
-    def add(self):
+    def add(self, question=None):
         # question;multiple_choices;correct_answer
         # if multipple_choices is omited, then it will be treated as
         # free-form question instead of quiz with multiple choices
@@ -272,9 +268,9 @@ class Question:
         # free-form example: Capital of Poland;;Warsaw
         # quiz example: Capital of Poland;Vilnius, Riga, Kiev;Warsaw
 
-        template = {
+        row = {
             '_id': max(row['_id'] for row in self.db) + 1,
-            'status': 'active',
+            'active': True,
             'question': '',
             'choices': '',
             'answer': '',
@@ -282,26 +278,31 @@ class Question:
             'correct': 0,
         }
 
-        question = input('Your question: ')
+        if not question:
+            question = input('Your question: ')
+
         question = question.split(';')
 
-        template['question'] = question[0]
-        template['choices'] = question[1]
-        template['answer'] = question[2]
+        row['question'] = question[0]
+        row['choices'] = question[1]
+        row['answer'] = question[2]
 
-        self.db.append(template)
+        self.db.append(row)
         self.data.save()
+
+        return self._tabulate_data([row])
 
     def reset(self):
-        qu_index = self._get_question_index()
-        row = self.db[qu_index]
-
-        row['active'] = True
-        row['times_shown'] = 0
-        row['correct'] = 0
+        qs_index = self._get_questions_index()
+        rows = []
+        for index in qs_index:
+            rows.append(self.db[index])
+            self.db[index]['active'] = True
+            self.db[index]['times_shown'] = 0
+            self.db[index]['correct'] = 0
 
         self.data.save()
-        return self._tabulate_data([row])
+        return self._tabulate_data(rows)
 
     def reset_all(self):
         for row in self.db:
@@ -310,36 +311,75 @@ class Question:
         self.data.save()
 
     def stats(self) -> str:
-        qu_index = self._get_question_index()
-        row = self.db[qu_index]
-        return self._tabulate_data([row])
+        qs_index = self._get_questions_index()
+        rows = []
+        for index in qs_index:
+            rows.append(self.db[index])
+
+        return self._tabulate_data(rows)
 
     def toggle_status(self) -> str:
-        qu_index = self._get_question_index()
-        row = self.db[qu_index]
-        row['active'] = not row['active']
+        qs_index = self._get_questions_index()
+        rows = []
+        for index in qs_index:
+            rows.append(self.db[index])
+            self.db[index]['active'] ^= True
 
         self.data.save()
-        return self._tabulate_data([row])
+        return self._tabulate_data(rows)
+
+    def enable(self) -> str:
+        qs_index = self._get_questions_index()
+        rows = []
+        for index in qs_index:
+            self.db[index]['active'] = True
+            rows.append(self.db[index])
+
+        self.data.save()
+        return self._tabulate_data(rows)
+
+    def disable(self) -> str:
+        qs_index = self._get_questions_index()
+        rows = []
+        for index in qs_index:
+            self.db[index]['active'] = False
+            rows.append(self.db[index])
+
+        self.data.save()
+        return self._tabulate_data(rows)
 
     def update(self):
-        qu_index = self._get_question_index()
-        row = self.db[qu_index]
+        # <question>;<multiple answer options>;<true answer>
+        # input example: Whats your question?;One, Two answer;Correct answer
+        qs_index = self._get_questions_index()
 
-        question = input('Your question: ')
-        question = question.split(';')
+        rows = []
 
-        row['question'] = question[0]
-        row['choices'] = question[1]
-        row['answer'] = question[2]
+        for index in qs_index:
+            row = self.db[index]
+
+            print(self._tabulate_data([row]))
+
+            question = input('Your question: ')
+            question = question.split(';')
+
+            row['question'] = question[0]
+            row['choices'] = question[1]
+            row['answer'] = question[2]
+
+            rows.append(row)
 
         self.data.save()
-        return self._tabulate_data([row])
+        return self._tabulate_data(rows)
 
     def remove(self):
-        qu_index = self._get_question_index()
+        indexes = self._get_questions_index()
+        indexes.sort()
 
-        self.db.pop(qu_index)
+        for i, _ in reversed(list(enumerate(self.db))):
+            if i in indexes:
+                self.db.pop(i)
+
         self.data.save()
 
     def status(self) -> str:
@@ -391,8 +431,12 @@ def main():
     # Questions manipulation
     if args['question']:
         if args['<id>']:
-            if args['--active']:
+            if args['--toggle-status']:
                 print(q.toggle_status())
+            elif args['--disable']:
+                print(q.disable())
+            elif args['--enable']:
+                print(q.enable())
             elif args['--update']:
                 print(q.update())
             elif args['--reset']:
@@ -404,6 +448,7 @@ def main():
             else:
                 print(q.stats())
         elif args['--add']:
+            # print(q.add(args['--add']))
             print(q.add())
         elif args['--reset-all']:
             q.reset_all()
@@ -427,7 +472,8 @@ TODO:
 1. Add -v switch
 3. Add confirmation dialog, e.g. do you really want to reset all questions? yN
 4. Create class Question with __iter__ method https://dev.to/htv2012/how-to-write-a-class-object-to-csv-5be1
-6. Implement question --disable=1; --disable=1,2,4,6; --disable=1-20
 7. Fix that adding new  questions there wouldn't be spaces between answer,question,etc
 8. Use python standard log library to output text to console?
+9. Fix question ids 5,9 breaking grid print. Question, choices, answer
+   columns should increase in height for those lines.
 """
