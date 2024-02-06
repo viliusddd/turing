@@ -8,34 +8,31 @@ options to manage the questions.
 Usage:
   ./quiz.py [options]
   ./quiz.py test|practice|question|stats|reset
-  ./quiz.py test [--amount=<amount>] [--mode=<mode>]
-  ./quiz.py practice [--amount=<amount>] [--mode=<mode>]
-  ./quiz.py stats [--id=<id>|--user=<username>] [--status=<status> --type=<type>]
+  ./quiz.py test [--limit=<amount>] [--mode=<mode>]
+  ./quiz.py practice [--mode=<mode>]
   ./quiz.py profile [<username>|--user=<username>|--add-user=<username>|--remove-user=<username>]
   ./quiz.py question [--stats|--toggle-status|--enable|--disable|--update|--remove|--reset] <id>
   ./quiz.py question [--reset-all|--add]
 
 Commands:
-  test              Test mode
-  practice          Practice mode
-  question          Questions editing mode
-  stats             Show statistics of questions
-  profile           Create/change/see status of profile
+  test                 Test mode
+  practice             Practice mode
+  question             Questions editing mode
+  stats                Show statistics of questions
+  profile              Create/change/see status of profile
 
 Options:
-  -h --help         Show this screen.
-  -a --add          Add question
-  -r --remove       Remove question
-  --toggle-status   Toggle status of question from active to inactive
-                    and vise versus.
-  --all             Show all questions
-  --active          Show active questions
-  --inactive        Show inactive questions
-#   --status          Choose to show only active or inactive questions
-  --type            Choose to show free-form or multi-choice questions
-  -v --verbose      Print verbose output to terminal: Print explanations
-  -vv               Print very verbose output to terminal: print explanations and output tables
-  --reset-all       Reset all questions numbers
+  -h --help            Show this screen.
+  -a --add             Add question
+  -r --remove          Remove question.
+  --toggle-status      Toggle status of question from active to inactive
+                       and vice versus.
+  -l --limit=<amount>  Number of test questions to run. [default: 5].
+  -m --mode=<mode>     One of the modes: typing, choosing, mixed. [default: mixed].
+
+  -v --verbose         Print verbose output to terminal: Print explanations
+  -vv                  Print very verbose output to terminal: print explanations and output tables
+  --reset-all          Reset all questions numbers
 '''
 import csv
 import random
@@ -152,7 +149,7 @@ class Question:
 
         return rows
 
-    def _filter_by_mode(self, rows, mode='mixed'):
+    def _filter_by_mode(self, mode='mixed'):
         '''
         There are 3 testing/practicing modes:
           - choosing: if mode is set to 'choosing' then user will only
@@ -165,10 +162,10 @@ class Question:
         '''
         new_rows = []
 
-        for row in rows:
+        for row in self.db:
             if row['active']:
                 if mode == 'mixed':
-                    new_rows = rows
+                    new_rows = self.db
                 elif mode == 'typing':
                     if row['choices'] == '':
                         new_rows.append(row)
@@ -180,20 +177,26 @@ class Question:
 
         return new_rows
 
+    def practice(self, answer_mode='mixed'):
+        rows = self._filter_by_mode(mode=answer_mode)
+        rows = random.sample(rows, len(rows))
+
+        self._user_input(rows, limited=False)
+
     def test(self, amount=5, answer_mode='mixed'):
         amount = int(amount)
 
         # if amount < 5:
         #     raise ValueError('At least 5 questions are required to start test.')
 
-        rows = self._filter_by_mode(rows=self.db, mode=answer_mode)
+        rows = self._filter_by_mode(mode=answer_mode)
         rows = random.sample(rows, amount)
 
         if amount > len(rows):
             raise ValueError(f'Required amount is lower than \
                              available questions. {amount}>{len(rows)}.')
 
-        self._user_input(rows, amount)
+        self._user_input(rows, limited=True)
 
     def _typing_input(self, row):
         while True:
@@ -219,33 +222,41 @@ class Question:
             if user_letter.upper() in abc[:len(choices)]:
                 return choices[user_letter.upper()]
 
-    def _user_input(self, rows, amount):
+    def _user_input(self, rows, limited=False):
         user_stats = {'correct': 0, 'total': 0, 'duration': ''}
         start_time = time.time()
 
-        for i, row in enumerate(rows):
-            print(f'{i + 1}. {row["question"]}')
-            try:
-                if row['choices'] != '':
-                    user_answer = self._choosing_input(row)
-                else:
-                    user_answer = self._typing_input(row)
-            except (EOFError, KeyboardInterrupt):
-                print('\n' + '-' * 80)
-                break
-            else:
-                if user_answer == row['answer']:
-                    print('Success! Your answer is correct!')
-                    row['correct'] += 1
-                    user_stats['correct'] += 1
-                else:
-                    print(f'You are wrong. Correct answer: {row["answer"]}')
+        try:
+            num = 1
+            while True:
+                for row in rows:
+                    print(f'{num}. {row["question"]}')
 
-            print('-' * 80)
-            row['times_shown'] += 1
-            user_stats['total'] += 1
+                    if row['choices'] != '':
+                        user_answer = self._choosing_input(row)
+                    else:
+                        user_answer = self._typing_input(row)
 
-            self.data.save_row(row)
+                    if user_answer == row['answer']:
+                        print('Success! Your answer is correct!')
+                        row['correct'] += 1
+                        user_stats['correct'] += 1
+                    else:
+                        print(f'You are wrong. Correct answer: {row["answer"]}')
+
+                    print('-' * 80)
+                    row['times_shown'] += 1
+                    user_stats['total'] += 1
+
+                    self.data.save_row(row)
+
+                    num += 1
+
+                if limited:
+                    break
+
+        except (EOFError, KeyboardInterrupt):
+            print('\n' + '-' * 80)
 
         user_stats['duration'] =  time.time() - start_time
         self._user_stats_msg(user_stats)
@@ -399,7 +410,7 @@ class Question:
                 row['correct'] = '0%'
             else:
                 row['correct'] = \
-                    f'{row["times_shown"] / row["correct"] * 100}%'
+                    f'{row["correct"] / row["times_shown"] * 100:.0f}%'
 
         table = tabulate(
             self.db,
@@ -420,11 +431,16 @@ def main():
         print(q.status())
 
     # Practice
+    if args['practice']:
+        if args['--mode']:
+            q.practice(args['--mode'])
+        else:
+            q.practice()
 
     # Test
     if args['test']:
-        if args['--amount'] or args['--mode']:
-            q.test(args['--amount'], args['--mode'])
+        if args['--limit'] or args['--mode']:
+            q.test(args['--limit'], args['--mode'])
         else:
             q.test()
 
