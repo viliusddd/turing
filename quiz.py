@@ -180,6 +180,12 @@ class Question:
 
         self._user_input(rows, amount)
 
+    def _typing_input(self, row):
+        while True:
+            user_answer = input('Your answer: ')
+            if user_answer:
+                return user_answer
+
     def _choosing_input(self, row):
         abc = ['A', 'B', 'C', 'D', 'E', 'F']
 
@@ -197,7 +203,6 @@ class Question:
 
             if user_letter.upper() in abc[:len(choices)]:
                 return choices[user_letter]
-                break
 
     def _user_input(self, rows, amount):
         user_stats = {'correct': 0, 'total': 0, 'duration': ''}
@@ -207,11 +212,9 @@ class Question:
             print(f'{i + 1}. {row["question"]}')
             try:
                 if row['choices'] != '':
-                    # 'choosing' mode
                     user_answer = self._choosing_input(row)
                 else:
-                    # 'typing' mode
-                    user_answer = input('Your answer: ')
+                    user_answer = self._typing_input(row)
             except (EOFError, KeyboardInterrupt):
                 print('\n' + '-' * 80)
                 break
@@ -427,5 +430,4 @@ TODO:
 6. Implement question --disable=1; --disable=1,2,4,6; --disable=1-20
 7. Fix that adding new  questions there wouldn't be spaces between answer,question,etc
 8. Use python standard log library to output text to console?
-13. Dont allow empty answers in 'typing' mode
 """
