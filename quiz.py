@@ -193,12 +193,11 @@ class Question:
             print(f'\t{letter}. {choice}')
 
         while True:
-            user_answer = input('Choose letter: ')
-            if user_answer.upper() in abc[:len(choices)]:
-                user_answer = user_answer.upper()
-                break
+            user_letter = input('Choose letter: ')
 
-        return user_answer
+            if user_letter.upper() in abc[:len(choices)]:
+                return choices[user_letter]
+                break
 
     def _user_input(self, rows, amount):
         user_stats = {'correct': 0, 'total': 0, 'duration': ''}
@@ -428,6 +427,5 @@ TODO:
 6. Implement question --disable=1; --disable=1,2,4,6; --disable=1-20
 7. Fix that adding new  questions there wouldn't be spaces between answer,question,etc
 8. Use python standard log library to output text to console?
-12. Fix choosing mode doesn't accept letter A,B,etc as answer (correct)
 13. Dont allow empty answers in 'typing' mode
 """
