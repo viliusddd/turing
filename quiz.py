@@ -40,9 +40,8 @@ Options:
 '''
 import csv
 import random
-import sys
+import time
 
-from datetime import datetime, timedelta
 from docopt import docopt
 from pprint import pprint
 from tabulate import tabulate
@@ -166,69 +165,20 @@ class Question:
 
         return new_rows
 
-    def _randomize_rows(self, rows):
-        random.shuffle(rows)
-        return rows
+    def test(self, amount=5, answer_mode='mixed'):
+        amount = int(amount)
 
-    def test(self, amount=5, answer_mode='mixed', weighted=False):
         # if amount < 5:
         #     raise ValueError('At least 5 questions are required to start test.')
 
-        answer_mode = 'mixed'
-
         rows = self._filter_by_mode(rows=self.db, mode=answer_mode)
-        rows = self._randomize_rows(rows)
-        rows = rows[:amount]
+        rows = random.sample(rows, amount)
 
         if amount > len(rows):
-            raise ValueError(
-                f'Required amount is lower than available questions. {amount}>{len(rows)}.')
+            raise ValueError(f'Required amount is lower than \
+                             available questions. {amount}>{len(rows)}.')
 
-        match answer_mode:
-            case 'typing':
-                self._typing_mode(rows)
-            case 'choosing':
-                self._choosing_mode(rows)
-            case 'mixed':
-                self._mixed_mode(rows)
-
-    def _mixed_mode(self, rows):
-        user_stats = {'correct': 0, 'total': 0, 'start': '', 'end': ''}
-        user_stats['start'] = datetime.timestamp(datetime.now())
-
-        for i, row in enumerate(rows):
-            print(f'{i + 1}. {row["question"]}')
-
-            try:
-                if row['choices'] != '':
-                    # choosing mode
-                    user_answer = self._choosing_input(row)
-                else:
-                    # typing mode
-                    user_answer = input('Your answer: ')
-            except (EOFError, KeyboardInterrupt):
-                print('' + '-' * 80)
-                break
-            else:
-                if user_answer == row['answer']:
-                    print('Success! Your answer is correct!')
-                    row['correct'] += 1
-                    user_stats['correct'] += 1
-                else:
-                    print(f'You are wrong. Correct answer: {row["answer"]}')
-
-            print('-' * 80)
-            row['times_shown'] += 1
-            user_stats['total'] += 1
-
-            self.data.save_row(row)
-
-        user_stats['end'] = datetime.timestamp(datetime.now())
-        print(self._user_stats_msg(user_stats))
-
-    def _typing_input(self, row):
-        user_answer = input('Your answer: ')
-        return user_answer
+        self._user_input(rows, amount)
 
     def _choosing_input(self, row):
         abc = ['A', 'B', 'C', 'D']
@@ -250,21 +200,29 @@ class Question:
 
         return user_answer
 
-    def _typing_mode(self, rows):
-        user_stats = {'correct': 0, 'total': 0, 'start': '', 'end': ''}
-        user_stats['start'] = datetime.timestamp(datetime.now())
+    def _user_input(self, rows, amount):
+        user_stats = {'correct': 0, 'total': 0, 'duration': ''}
+        start_time = time.time()
 
         for i, row in enumerate(rows):
             print(f'{i + 1}. {row["question"]}')
-
-            user_answer = input('Your answer: ')
-
-            if user_answer == row['answer']:
-                print('Success! Your answer is correct!')
-                row['correct'] += 1
-                user_stats['correct'] += 1
+            try:
+                if row['choices'] != '':
+                    # 'choosing' mode
+                    user_answer = self._choosing_input(row)
+                else:
+                    # 'typing' mode
+                    user_answer = input('Your answer: ')
+            except (EOFError, KeyboardInterrupt):
+                print('\n' + '-' * 80)
+                break
             else:
-                print(f'You are wrong. Correct answer: {row["answer"]}')
+                if user_answer == row['answer']:
+                    print('Success! Your answer is correct!')
+                    row['correct'] += 1
+                    user_stats['correct'] += 1
+                else:
+                    print(f'You are wrong. Correct answer: {row["answer"]}')
 
             print('-' * 80)
             row['times_shown'] += 1
@@ -272,70 +230,19 @@ class Question:
 
             self.data.save_row(row)
 
-        user_stats['end'] = datetime.timestamp(datetime.now())
-        print(self._user_stats_msg(user_stats))
-
-    def _choosing_mode(self, rows):
-        """
-        TODO: Error if write other Than A B C D
-        """
-        abc = ['A', 'B', 'C', 'D']
-
-        user_stats = {'correct': 0, 'total': 0, 'start': '', 'end': ''}
-        user_stats['start'] = datetime.timestamp(datetime.now())
-
-        for i, row in enumerate(rows):
-            print(f'{i + 1}. {row["question"]}')
-
-            choices = row['choices'].split(', ')
-            choices.append(row['answer'])
-
-            random.shuffle(choices)
-            choices = (dict(zip(abc, choices)))
-
-            for letter, choice in choices.items():
-                print(f'\t{letter}. {choice}')
-
-            while True:
-                user_answer = input('Choose letter: ')
-                if user_answer.upper() in abc:
-                    user_answer = user_answer.upper()
-                    break
-
-            if choices[user_answer] == row['answer']:
-                print('Success! Your answer is correct!')
-                row['correct'] += 1
-                user_stats['correct'] += 1
-            else:
-                print(f'You are wrong. Correct answer: {row["answer"]}')
-
-            print('-' * 80)
-            row['times_shown'] += 1
-            user_stats['total'] += 1
-
-            self.data.save_row(row)
-
-        user_stats['end'] = datetime.timestamp(datetime.now())
-        print(self._user_stats_msg(user_stats))
+        user_stats['duration'] =  time.time() - start_time
+        self._user_stats_msg(user_stats)
 
     def _user_stats_msg(self, stats:dict):
-        duration = str(timedelta(minutes=(stats['end'] - stats['start'])))
         total = f'{stats["correct"]}/{stats["total"]}'
-
+        duration = time.strftime(
+            "%M min %S sec.", time.gmtime(stats['duration'])
+        )
         msg = f'{total} questions answered correctly.\n' \
-              f'Test took {duration[:-7]} time.'
+              f'Test took {duration}'
 
         print(msg)
         # return
-
-    def test_mode(self, amount=10, weighted=False):
-        '''
-        Filter questions for Test mode
-        '''
-        filtered = self._filter_columns(enabled=True, choices=False)
-
-        if amount > len(filtered):
-            raise ValueError('Tere are less questions than requested.')
 
     def _filter_practice_questions(self):
         ...
@@ -354,7 +261,6 @@ class Question:
                 row['times_shown'] += 1
 
         self.data.save()
-
 
     def add(self):
         # question;multiple_choices;correct_answer
@@ -466,17 +372,17 @@ def main():
     args = docopt(__doc__, version='0.01')
     # print(args)
 
-    # q = Question(args['<id>'], 'db1_short.csv')
     q = Question(args['<id>'], 'db1.csv')
-
-    q.test(3)
 
     if args['stats']:
         print(q.status())
 
+    # Practice
+
+    # Test
     if args['test']:
-        if args['--amount']:
-            q.test(args['--amount'])
+        if args['--amount'] or args['--mode']:
+            q.test(args['--amount'], args['--mode'])
         else:
             q.test()
 
@@ -511,7 +417,7 @@ if __name__ == '__main__':
     main()
 
 # Link to the public GitHub repo tha contains my work from Part 3:
-# TODO: https://github.com/viliusddd/turing/quiz
+# TODO: https://github.com/viliusddd/turing/
 
 
 """
@@ -523,4 +429,7 @@ TODO:
 7. Fix that adding new  questions there wouldn't be spaces between answer,question,etc
 8. Use python standard log library to output text to console?
 9. change 'enabled' to 'active'
+12. Fix choosing mode doesn't accept letter A,B,etc as answer (correct)
+13. Dont allow empty answers in 'typing' mode
+14. Only allow to choose existing LETTERS: or better only accept existing(printed letters)
 """
