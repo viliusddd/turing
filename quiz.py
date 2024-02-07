@@ -16,9 +16,9 @@ Try:
   quiz.py test --limit 10 --mode typing
   quiz.py practice
   quiz.py stats
-  quiz.py question --add
-  quiz.py question --disable 2-7
-  quiz.py question --toggle-status 1,6,7
+  quiz.py question add
+  quiz.py question disable 2-7
+  quiz.py question toggle 1,6,7
 
 Commands:
   test                 Test mode
