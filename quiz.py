@@ -44,8 +44,10 @@ Arguments:
 
 '''
 import csv
+import logging
 import random
 import time
+import sys
 
 from docopt import docopt
 from pprint import pprint
@@ -436,7 +438,28 @@ class Question:
         return table
 
 
+def init_logging(filename='results.log'):
+    '''
+    Logs messages to file and stdout. Both use different formatting.
+    '''
+    std_formatter = logging.Formatter('%(asctime)s %(message)s')
+    cli_formatter = logging.Formatter('%(message)s')
+
+    rootLogger = logging.getLogger()
+    rootLogger.setLevel(logging.DEBUG)
+
+    file_handler = logging.FileHandler(filename)
+    file_handler.setFormatter(std_formatter)
+    rootLogger.addHandler(file_handler)
+
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(cli_formatter)
+    rootLogger.addHandler(console_handler)
+
+
 def main():
+    init_logging()
+
     args = docopt(__doc__, version='0.01')
     # print(args)
 
