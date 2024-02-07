@@ -34,10 +34,9 @@ Options:
   --toggle-status      Toggle status of question from active to inactive
                        and vice versus.
   -l --limit=<amount>  Number of test questions to run. [default: 5].
-  -m --mode=<mode>     One of the modes: typing, choosing, mixed. [default: mixed].
+  -m --mode=<mode>     One of modes: typing, choosing, mixed. [default: mixed].
 
   -v --verbose         Print verbose output to terminal: Print explanations
-  -vv                  Print very verbose output to terminal: print explanations and output tables
   --reset-all          Reset all questions numbers
 
 Arguments:
@@ -91,7 +90,7 @@ class Question:
         self.data = Data(filename)
         self.db = self.data.db
 
-    def _tabulate_data(self, rows:list) -> str:
+    def _tabulate_data(self, rows: list) -> str:
         table = tabulate(
             rows,
             headers='keys',
@@ -145,9 +144,9 @@ class Question:
             elif (not choices) and (row['choices'] == ''):
                 choices_db.append(row)
 
-        return(choices_db)
+        return choices_db
 
-    def _rows_from_ids(self, qids:list) -> list:
+    def _rows_from_ids(self, qids: list) -> list:
         rows = []
         for row in self.db:
             for qid in qids:
@@ -196,7 +195,7 @@ class Question:
                 weights.append(weight)
 
         rows = random.choices(rows, weights=weights, k=(int(len(rows))))
-        return(rows)
+        return rows
 
     def practice(self, answer_mode='mixed'):
         rows = self._filter_by_mode(mode=answer_mode)
@@ -208,7 +207,7 @@ class Question:
         amount = int(amount)
 
         # if amount < 5:
-        #     raise ValueError('At least 5 questions are required to start test.')
+        #     raise ValueError('At least 5 questions required to start test.')
 
         rows = self._filter_by_mode(mode=answer_mode)
         rows = random.sample(rows, amount)
@@ -266,7 +265,7 @@ class Question:
                         row['correct'] += 1
                         user_stats['correct'] += 1
                     else:
-                        print(f'You are wrong. Correct answer: {row["answer"]}')
+                        print(f'You\'re wrong. Right answer: {row["answer"]}')
 
                     print('-' * 80)
                     row['times_shown'] += 1
@@ -282,10 +281,10 @@ class Question:
         except (EOFError, KeyboardInterrupt):
             print('\n' + '-' * 80)
 
-        user_stats['duration'] =  time.time() - start_time
+        user_stats['duration'] = time.time() - start_time
         self._user_stats_msg(user_stats)
 
-    def _user_stats_msg(self, stats:dict):
+    def _user_stats_msg(self, stats: dict):
         total = f'{stats["correct"]}/{stats["total"]}'
         duration = time.strftime(
             "%M min %S sec.", time.gmtime(stats['duration'])
@@ -484,12 +483,12 @@ def main():
     elif args['stats']:
         print(q.status())
 
+
 if __name__ == '__main__':
     main()
 
 # Link to the public GitHub repo tha contains my work from Part 3:
 # TODO: https://github.com/viliusddd/turing/
-
 
 """
 TODO:
@@ -502,10 +501,10 @@ TODO:
 - switch to change db file
 - show help on app start without args
 - fix ./quiz.py question stats 1 : two tables
-- The user should not be able to enter practice or test modes until at least 5 questions have been added.
+- The user should not be able to enter practice or test modes until at least 5
+  questions have been added.
 - double-check if disabled questions are shown in practice and test
 - test should save results.txt file with the list of scores. add date and time.
 - unit tests: at least 3
-- run flake8
 - add option to remove all questions?
 """
