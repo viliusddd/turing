@@ -6,20 +6,26 @@ questions. The program will track user statistics and provide
 options to manage the questions.
 
 Usage:
-  ./quiz.py [options]
-  ./quiz.py test|practice|question|stats|reset
-  ./quiz.py test [--limit=<amount>] [--mode=<mode>]
-  ./quiz.py practice [--mode=<mode>]
-  ./quiz.py profile [<username>|--user=<username>|--add-user=<username>|--remove-user=<username>]
-  ./quiz.py question [--stats|--toggle-status|--enable|--disable|--update|--remove|--reset] <id>
-  ./quiz.py question [--reset-all|--add]
+  quiz.py test | practice | question | stats | reset
+  quiz.py test [--limit=<amount>] [--mode=<mode>]
+  quiz.py practice [--mode=<mode>]
+  quiz.py question (stats|toggle|enable|disable|update|remove|reset) <id>
+  quiz.py question (reset-all|add)
+
+Try:
+  quiz.py test --limit 10 --mode typing
+  quiz.py practice
+  quiz.py stats
+  quiz.py question --add
+  quiz.py question --disable 2-7
+  quiz.py question --toggle-status 1,6,7
 
 Commands:
   test                 Test mode
   practice             Practice mode
   question             Questions editing mode
   stats                Show statistics of questions
-  profile              Create/change/see status of profile
+  reset                Remove all question
 
 Options:
   -h --help            Show this screen.
@@ -33,6 +39,10 @@ Options:
   -v --verbose         Print verbose output to terminal: Print explanations
   -vv                  Print very verbose output to terminal: print explanations and output tables
   --reset-all          Reset all questions numbers
+
+Arguments:
+  <id>                 Id of question from the database/csv.
+
 '''
 import csv
 import random
@@ -42,9 +52,6 @@ from docopt import docopt
 from pprint import pprint
 from tabulate import tabulate
 
-
-class Profile:
-    ...
 
 class Data:
     def __init__(self, filename):
@@ -89,7 +96,7 @@ class Question:
             rows,
             headers='keys',
             tablefmt='rounded_grid',
-            colalign=('right', 'center', 'left', 'left', 'left', 'center')
+            colalign=('right', 'center', 'right')
         )
         return table
 
@@ -415,14 +422,6 @@ class Question:
         Show grid with questions and their status
         """
         for row in self.db:
-            if row['choices']:
-                row['type'] = 'multi-choice'
-            else:
-                row['type'] = 'free-form'
-
-            row.pop('answer')
-            row.pop('choices')
-
             if row['correct'] == 0:
                 row['correct'] = '0%'
             else:
@@ -433,7 +432,7 @@ class Question:
             self.db,
             headers='keys',
             tablefmt='rounded_grid',
-            colalign=('right', 'center', 'left', 'left', 'left', 'center')
+            colalign=('right', 'center', 'right')
         )
         return table
 
@@ -444,54 +443,46 @@ def main():
 
     q = Question(args['<id>'], 'db1.csv')
 
-    if args['stats']:
-        print(q.status())
-
     # Practice
     if args['practice']:
         if args['--mode']:
             q.practice(args['--mode'])
         else:
             q.practice()
-
     # Test
-    if args['test']:
+    elif args['test']:
         if args['--limit'] or args['--mode']:
             q.test(args['--limit'], args['--mode'])
         else:
             q.test()
-
     # Questions manipulation
-    if args['question']:
+    elif args['question']:
         if args['<id>']:
-            if args['--toggle-status']:
+            if args['toggle']:
                 print(q.toggle_status())
-            elif args['--disable']:
+            elif args['disable']:
                 print(q.disable())
-            elif args['--enable']:
+            elif args['enable']:
                 print(q.enable())
-            elif args['--update']:
+            elif args['update']:
                 print(q.update())
-            elif args['--reset']:
+            elif args['reset']:
                 print(q.reset())
-            elif args['--remove']:
+            elif args['remove']:
                 q.remove()
-            elif args['--stats']:
+            elif args['stats']:
                 print(q.stats())
-            else:
-                print(q.stats())
-        elif args['--add']:
+        elif args['add']:
             # print(q.add(args['--add']))
             print(q.add())
-        elif args['--reset-all']:
+        elif args['reset-all']:
             q.reset_all()
         else:
             print(q.status())
-
-    # reset
-    if args['reset']:
+    elif args['reset']:
         q.reset()
-
+    elif args['stats']:
+        print(q.status())
 
 if __name__ == '__main__':
     main()
@@ -508,4 +499,13 @@ TODO:
 8. Use python standard log library to output text to console?
 9. Fix question ids 5,9 breaking grid print. Question, choices, answer
    columns should increase in height for those lines.
+- switch to change db file
+- show help on app start without args
+- fix ./quiz.py question stats 1 : two tables
+- The user should not be able to enter practice or test modes until at least 5 questions have been added.
+- double-check if disabled questions are shown in practice and test
+- test should save results.txt file with the list of scores. add date and time.
+- unit tests: at least 3
+- run flake8
+- add option to remove all questions?
 """
