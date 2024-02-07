@@ -50,7 +50,6 @@ import time
 import sys
 
 from docopt import docopt
-from pprint import pprint
 from tabulate import tabulate
 
 
@@ -191,7 +190,8 @@ class Question:
             if row['correct'] == 0:
                 weights.append(9.9)
             else:
-                weight = round(10 - (row['correct'] / row['times_shown'] * 10), 1)
+                ratio = 10 - (row['correct'] / row['times_shown'] * 10)
+                weight = round(ratio, 1)
                 if weight == 0:
                     weight = 0.5
                 weights.append(weight)
@@ -284,17 +284,19 @@ class Question:
             print('\n' + '-' * 80)
 
         user_stats['duration'] = time.time() - start_time
+
         self._user_stats_msg(user_stats)
 
     def _user_stats_msg(self, stats: dict):
         total = f'{stats["correct"]}/{stats["total"]}'
-        duration = time.strftime(
-            "%M min %S sec.", time.gmtime(stats['duration'])
-        )
-        msg = f'{total} questions answered correctly.\n' \
-              f'Test took {duration}'
+        total_perc = f'{stats["correct"] / stats["total"] * 100:.0f}%'
 
-        print(msg)
+        duration = time.strftime("%M min %S sec.",
+                                 time.gmtime(stats['duration']))
+
+        logging.info(
+            f'{total_perc} ({total}) correct answers. Test took {duration}'
+        )
 
     def add(self, question=None):
         # question;multiple_choices;correct_answer
@@ -442,9 +444,9 @@ def init_logging(filename='results.log'):
     '''
     Logs messages to file and stdout. Both use different formatting.
     '''
-    std_formatter = logging.Formatter('%(asctime)s %(message)s')
     cli_formatter = logging.Formatter('%(message)s')
-
+    std_formatter = logging.Formatter('%(asctime)s %(message)s',
+                                      datefmt='%Y-%m-%d %H:%M:%S')
     rootLogger = logging.getLogger()
     rootLogger.setLevel(logging.DEBUG)
 
@@ -458,10 +460,9 @@ def init_logging(filename='results.log'):
 
 
 def main():
-    init_logging()
+    init_logging('results.txt')
 
     args = docopt(__doc__, version='0.01')
-    # print(args)
 
     q = Question(args['<id>'], 'db1.csv')
 
@@ -517,7 +518,8 @@ if __name__ == '__main__':
 TODO:
 1. Add -v switch
 3. Add confirmation dialog, e.g. do you really want to reset all questions? yN
-4. Create class Question with __iter__ method https://dev.to/htv2012/how-to-write-a-class-object-to-csv-5be1
+4. Create class Question with __iter__ method
+    https://dev.to/htv2012/how-to-write-a-class-object-to-csv-5be1
 8. Use python standard log library to output text to console?
 9. Fix question ids 5,9 breaking grid print. Question, choices, answer
    columns should increase in height for those lines.
@@ -530,4 +532,6 @@ TODO:
 - test should save results.txt file with the list of scores. add date and time.
 - unit tests: at least 3
 - add option to remove all questions?
+-rename 'correct' to 'score'
+
 """
