@@ -6,7 +6,7 @@ questions. The program will track user statistics and provide
 options to manage the questions.
 
 Usage:
-  quiz.py test | practice | question | stats | reset
+  quiz.py (test|practice|question|stats|reset) [--db=<db_file>] [--results=<file>]
   quiz.py test [--limit=<amount>] [--mode=<mode>]
   quiz.py practice [--mode=<mode>]
   quiz.py question (stats|toggle|enable|disable|update|remove|reset) <id>
@@ -38,6 +38,8 @@ Options:
 
   -v --verbose         Print verbose output to terminal: Print explanations
   --reset-all          Reset all questions numbers
+  --results=<file>     Test results log file. [default: results.txt]
+  --db=<db_file>       CSV for questions and stats keeping. [default: db.csv]
 
 Arguments:
   <id>                 Id of question from the database/csv.
@@ -440,7 +442,7 @@ class Question:
         return table
 
 
-def init_logging(filename='results.log'):
+def init_logging(filename):
     '''
     Logs messages to file and stdout. Both use different formatting.
     '''
@@ -460,11 +462,19 @@ def init_logging(filename='results.log'):
 
 
 def main():
-    init_logging('results.txt')
-
     args = docopt(__doc__, version='0.01')
 
-    q = Question(args['<id>'], 'db1.csv')
+    results_name = 'results.txt'
+    if args['--results']:
+        results_name = args['--results']
+
+    db_name = 'db.csv'
+    if args['--db']:
+        db_name = args['--db']
+
+    init_logging(results_name)
+
+    q = Question(args['<id>'], db_name)
 
     # Practice
     if args['practice']:
@@ -516,22 +526,13 @@ if __name__ == '__main__':
 
 """
 TODO:
-1. Add -v switch
 3. Add confirmation dialog, e.g. do you really want to reset all questions? yN
 4. Create class Question with __iter__ method
     https://dev.to/htv2012/how-to-write-a-class-object-to-csv-5be1
-8. Use python standard log library to output text to console?
-9. Fix question ids 5,9 breaking grid print. Question, choices, answer
-   columns should increase in height for those lines.
-- switch to change db file
-- show help on app start without args
-- fix ./quiz.py question stats 1 : two tables
 - The user should not be able to enter practice or test modes until at least 5
   questions have been added.
 - double-check if disabled questions are shown in practice and test
-- test should save results.txt file with the list of scores. add date and time.
 - unit tests: at least 3
 - add option to remove all questions?
--rename 'correct' to 'score'
 
 """
