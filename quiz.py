@@ -88,10 +88,9 @@ class Data:
 
 
 class Question:
-    def __init__(self, qids, filename):
+    def __init__(self, qids, data):
+        self.data = data
         self.qids = qids or None
-        self.data = Data(filename)
-        self.db = self.data.db
 
     def _tabulate_data(self, rows: list) -> str:
         table = tabulate(
@@ -120,7 +119,7 @@ class Question:
 
         indexes = []
         for qid in qids:
-            for i, row in enumerate(self.db):
+            for i, row in enumerate(self.data.db):
                 if qid == row['_id']:
                     indexes.append(i)
         return indexes
@@ -133,8 +132,7 @@ class Question:
         '''
         enabled_db = []
 
-        # for row in self.db:
-        for row in self.db:
+        for row in self.data.db:
             if active and row['active']:
                 enabled_db.append(row)
             elif active is False and row['active'] is False:
@@ -151,7 +149,7 @@ class Question:
 
     def _rows_from_ids(self, qids: list) -> list:
         rows = []
-        for row in self.db:
+        for row in self.data.db:
             for qid in qids:
                 if row['_id'] == qid:
                     rows.append(row)
@@ -171,10 +169,10 @@ class Question:
         '''
         new_rows = []
 
-        for row in self.db:
+        for row in self.data.db:
             if row['active']:
                 if mode == 'mixed':
-                    new_rows = self.db
+                    new_rows = self.data.db
                 elif mode == 'typing':
                     if row['choices'] == '':
                         new_rows.append(row)
@@ -309,7 +307,7 @@ class Question:
         # quiz example: Capital of Poland;Vilnius, Riga, Kiev;Warsaw
 
         row = {
-            '_id': max(row['_id'] for row in self.db) + 1,
+            '_id': max(row['_id'] for row in self.data.db) + 1,
             'active': True,
             'question': '',
             'choices': '',
@@ -327,7 +325,7 @@ class Question:
         row['choices'] = question[1]
         row['answer'] = question[2]
 
-        self.db.append(row)
+        self.data.db.append(row)
         self.data.save()
 
         return self._tabulate_data([row])
@@ -336,16 +334,16 @@ class Question:
         qs_index = self._get_questions_index()
         rows = []
         for index in qs_index:
-            rows.append(self.db[index])
-            self.db[index]['active'] = True
-            self.db[index]['times_shown'] = 0
-            self.db[index]['correct'] = 0
+            rows.append(self.data.db[index])
+            self.data.db[index]['active'] = True
+            self.data.db[index]['times_shown'] = 0
+            self.data.db[index]['correct'] = 0
 
         self.data.save()
         return self._tabulate_data(rows)
 
     def reset_all(self):
-        for row in self.db:
+        for row in self.data.db:
             row['correct'] = 0
             row['times_shown'] = 0
         self.data.save()
@@ -354,7 +352,7 @@ class Question:
         qs_index = self._get_questions_index()
         rows = []
         for index in qs_index:
-            rows.append(self.db[index])
+            rows.append(self.data.db[index])
 
         return self._tabulate_data(rows)
 
@@ -362,8 +360,8 @@ class Question:
         qs_index = self._get_questions_index()
         rows = []
         for index in qs_index:
-            rows.append(self.db[index])
-            self.db[index]['active'] ^= True
+            rows.append(self.data.db[index])
+            self.data.db[index]['active'] ^= True
 
         self.data.save()
         return self._tabulate_data(rows)
@@ -372,8 +370,8 @@ class Question:
         qs_index = self._get_questions_index()
         rows = []
         for index in qs_index:
-            self.db[index]['active'] = True
-            rows.append(self.db[index])
+            self.data.db[index]['active'] = True
+            rows.append(self.data.db[index])
 
         self.data.save()
         return self._tabulate_data(rows)
@@ -382,8 +380,8 @@ class Question:
         qs_index = self._get_questions_index()
         rows = []
         for index in qs_index:
-            self.db[index]['active'] = False
-            rows.append(self.db[index])
+            self.data.db[index]['active'] = False
+            rows.append(self.data.db[index])
 
         self.data.save()
         return self._tabulate_data(rows)
@@ -396,7 +394,7 @@ class Question:
         rows = []
 
         for index in qs_index:
-            row = self.db[index]
+            row = self.data.db[index]
 
             print(self._tabulate_data([row]))
 
@@ -416,9 +414,9 @@ class Question:
         indexes = self._get_questions_index()
         indexes.sort()
 
-        for i, _ in reversed(list(enumerate(self.db))):
+        for i, _ in reversed(list(enumerate(self.data.db))):
             if i in indexes:
-                self.db.pop(i)
+                self.data.db.pop(i)
 
         self.data.save()
 
@@ -426,7 +424,7 @@ class Question:
         """
         Show grid with questions and their status
         """
-        for row in self.db:
+        for row in self.data.db:
             if row['correct'] == 0:
                 row['correct'] = '0%'
             else:
@@ -434,7 +432,7 @@ class Question:
                     f'{row["correct"] / row["times_shown"] * 100:.0f}%'
 
         table = tabulate(
-            self.db,
+            self.data.db,
             headers='keys',
             tablefmt='rounded_grid',
             colalign=('right', 'center', 'right')
@@ -468,13 +466,14 @@ def main():
     if args['--results']:
         results_name = args['--results']
 
-    db_name = 'db.csv'
+    db_name = 'db1.csv'
     if args['--db']:
         db_name = args['--db']
 
     init_logging(results_name)
 
-    q = Question(args['<id>'], db_name)
+    data = Data(filename=db_name)
+    q = Question(args['<id>'], data)
 
     # Practice
     if args['practice']:
