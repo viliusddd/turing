@@ -9,7 +9,7 @@ Usage:
   quiz.py (test|practice|question|stats|reset) [--db=<db_file>] [--results=<file>]
   quiz.py test [--limit=<amount>] [--mode=<mode>]
   quiz.py practice [--mode=<mode>]
-  quiz.py question (stats|toggle|enable|disable|update|remove|reset) <id>
+  quiz.py question <id> (stats|toggle|enable|disable|update|remove|reset)
   quiz.py question (reset-all|add)
 
 Try:
@@ -45,61 +45,43 @@ Arguments:
   <id>                 Id of question from the database/csv.
 
 '''
-import csv
+import copy
 import logging
 import random
 import time
 import sys
 
-from docopt import docopt
 from tabulate import tabulate
 
-
-class Data:
-    def __init__(self, filename):
-        self.filename = filename
-        self.db = []
-        self.get()
-
-    def get(self):
-        with open(self.filename) as file:
-            self.db = list(csv.DictReader(file))
-            for row in self.db:
-                row['_id'] = int(row['_id'])
-                row['times_shown'] = int(row['times_shown'])
-                row['correct'] = int(row['correct'])
-
-                if row['active'] == "True":
-                    row['active'] = True
-                else:
-                    row['active'] = False
-
-    def save(self):
-        with open(self.filename, 'w') as file:
-            writer = csv.DictWriter(file, fieldnames=[i for i in self.db[0]])
-            writer.writeheader()
-            writer.writerows(self.db)
-
-    def save_row(self, new_row):
-        for i, row in enumerate(self.db):
-            if int(row['_id']) == int(new_row['_id']):
-                self.db[i] = new_row
-                self.save()
+from tools.data import Data, Question, QuestionStatus, QuestionType
+from tools.questions import ModifyQuestion
+from tools.docopt import docopt
 
 
-class Question:
+class Quiz:
     def __init__(self, qids, data):
         self.data = data
         self.qids = qids or None
+        self.ids = self._split_question_ids() if qids else None
 
-    def _tabulate_data(self, rows: list) -> str:
-        table = tabulate(
-            rows,
-            headers='keys',
-            tablefmt='rounded_grid',
-            colalign=('right', 'center', 'right')
-        )
-        return table
+    def print_stats(self, rows: list = None, all=None) -> str:
+        if all:
+            rows = self.data.db
+
+        if not rows:
+            rows = [row for row in self.data.db if row.id in self.ids]
+
+        rows = copy.deepcopy(rows)
+
+        for row in rows:
+            row.choices = ', '.join(row.choices)
+            row.status = row.status.value
+            row.type = row.type.value
+
+        if rows:
+            print(tabulate(rows, headers='keys', tablefmt='rounded_grid'))
+        else:
+            print('The row doesn\'t exist')
 
     def _split_question_ids(self) -> list:
         if self.qids.isdigit():
@@ -120,41 +102,9 @@ class Question:
         indexes = []
         for qid in qids:
             for i, row in enumerate(self.data.db):
-                if qid == row['_id']:
+                if qid == row.id:
                     indexes.append(i)
         return indexes
-
-    def _filter_columns(self, active=True, choices=True):
-        '''
-        Choose which questions should be shown:
-            with or without choices;
-            active or inactive.
-        '''
-        enabled_db = []
-
-        for row in self.data.db:
-            if active and row['active']:
-                enabled_db.append(row)
-            elif active is False and row['active'] is False:
-                enabled_db.append(row)
-
-        choices_db = []
-        for row in enabled_db:
-            if choices and (row['choices'] != ''):
-                choices_db.append(row)
-            elif (not choices) and (row['choices'] == ''):
-                choices_db.append(row)
-
-        return choices_db
-
-    def _rows_from_ids(self, qids: list) -> list:
-        rows = []
-        for row in self.data.db:
-            for qid in qids:
-                if row['_id'] == qid:
-                    rows.append(row)
-
-        return rows
 
     def _filter_by_mode(self, mode='mixed'):
         '''
@@ -170,14 +120,14 @@ class Question:
         new_rows = []
 
         for row in self.data.db:
-            if row['active']:
+            if row.status.value == 'active':
                 if mode == 'mixed':
                     new_rows = self.data.db
                 elif mode == 'typing':
-                    if row['choices'] == '':
+                    if row.choices == '':
                         new_rows.append(row)
                 elif mode == 'choosing':
-                    if row['choices'] != '':
+                    if row.choices != '':
                         new_rows.append(row)
                 else:
                     raise TypeError('Chosen the wrong answering mode')
@@ -187,10 +137,10 @@ class Question:
     def weighted_choices(self, rows):
         weights = []
         for row in rows:
-            if row['correct'] == 0:
+            if row.correct == 0:
                 weights.append(9.9)
             else:
-                ratio = 10 - (row['correct'] / row['times_shown'] * 10)
+                ratio = 10 - (row.correct / row.times_shown * 10)
                 weight = round(ratio, 1)
                 if weight == 0:
                     weight = 0.5
@@ -220,7 +170,7 @@ class Question:
 
         self._user_input(rows, limited=True)
 
-    def _typing_input(self, row):
+    def _typing_input(self):
         while True:
             user_answer = input('Your answer: ')
             if user_answer:
@@ -229,15 +179,17 @@ class Question:
     def _choosing_input(self, row):
         abc = ['A', 'B', 'C', 'D', 'E', 'F']
 
-        choices = row['choices'].split(',')
-        choices = [ch.strip() for ch in choices]
-        choices.append(row['answer'])
+        choices = row.choices
+        choices.append(row.answer)
 
         random.shuffle(choices)
         choices = (dict(zip(abc, choices)))
 
         for letter, choice in choices.items():
             print(f'\t{letter}. {choice}')
+            if choice == row.answer:
+                i = row.choices.index(choice)
+                del row.choices[i]
 
         while True:
             user_letter = input('Choose letter: ')
@@ -255,22 +207,22 @@ class Question:
                 if not limited:
                     self.weighted_choices(rows)
                 for row in rows:
-                    print(f'{num}. {row["question"]}')
+                    print(f'{num}. {row.definition}')
 
-                    if row['choices'] != '':
+                    if row.choices:
                         user_answer = self._choosing_input(row)
                     else:
-                        user_answer = self._typing_input(row)
+                        user_answer = self._typing_input()
 
-                    if user_answer == row['answer']:
+                    if user_answer == row.answer:
                         print('Success! Your answer is correct!')
-                        row['correct'] += 1
+                        row.correct += 1
                         user_stats['correct'] += 1
                     else:
-                        print(f'You\'re wrong. Right answer: {row["answer"]}')
+                        print(f'You\'re wrong. Right answer: {row.answer}')
 
                     print('-' * 80)
-                    row['times_shown'] += 1
+                    row.times_shown += 1
                     user_stats['total'] += 1
 
                     self.data.save_row(row)
@@ -298,7 +250,7 @@ class Question:
             f'{total_perc} ({total}) correct answers. Test took {duration}'
         )
 
-    def add(self, question=None):
+    def add(self):
         # question;multiple_choices;correct_answer
         # if multipple_choices is omited, then it will be treated as
         # free-form question instead of quiz with multiple choices
@@ -306,109 +258,108 @@ class Question:
         # free-form example: Capital of Poland;;Warsaw
         # quiz example: Capital of Poland;Vilnius, Riga, Kiev;Warsaw
 
-        row = {
-            '_id': max(row['_id'] for row in self.data.db) + 1,
-            'active': True,
-            'question': '',
-            'choices': '',
-            'answer': '',
-            'times_shown': 0,
-            'correct': 0,
-        }
+        try:
+            last_id = max(row.id for row in self.data.db)
+        except ValueError:
+            last_id = 0
 
-        if not question:
-            question = input('Your question: ')
+        preview_row = [row for row in self.data.db if row.id == last_id]
 
-        question = question.split(';')
+        print('Example question:\n')
+        self.print_stats(preview_row)
 
-        row['question'] = question[0]
-        row['choices'] = question[1]
-        row['answer'] = question[2]
+        qu = input('Your question;answer;choices;type: ').strip().split(';')
 
+        choices = [ch.strip() for ch in qu[2].split(',')]
+        choices = list(filter(None, choices))  # remove empties
+
+        if len(choices) == 0 and qu[3] == 'quiz':
+            raise ValueError('There are no choices, but type is selected as quiz.')
+
+        row = Question(
+            id=last_id + 1,
+            definition=qu[0],
+            answer=qu[1],
+            choices=choices,
+            type=QuestionType(qu[3]),
+        )
         self.data.db.append(row)
         self.data.save()
 
-        return self._tabulate_data([row])
+        self.print_stats([row])
 
     def reset(self):
-        qs_index = self._get_questions_index()
-        rows = []
-        for index in qs_index:
-            rows.append(self.data.db[index])
-            self.data.db[index]['active'] = True
-            self.data.db[index]['times_shown'] = 0
-            self.data.db[index]['correct'] = 0
-
+        for row in self.data.db:
+            for id in self.ids:
+                if row.id == id:
+                    row.status = QuestionStatus('active')
+                    row.times_shown = 0
+                    row.correct = 0
         self.data.save()
-        return self._tabulate_data(rows)
+        self.print_stats()
 
     def reset_all(self):
         for row in self.data.db:
-            row['correct'] = 0
-            row['times_shown'] = 0
+            row.correct = 0
+            row.times_shown = 0
         self.data.save()
-
-    def stats(self) -> str:
-        qs_index = self._get_questions_index()
-        rows = []
-        for index in qs_index:
-            rows.append(self.data.db[index])
-
-        return self._tabulate_data(rows)
 
     def toggle_status(self) -> str:
-        qs_index = self._get_questions_index()
-        rows = []
-        for index in qs_index:
-            rows.append(self.data.db[index])
-            self.data.db[index]['active'] ^= True
+        for row in self.data.db:
+            for id in self.ids:
+                if row.id == id:
+                    if row.status.value == 'inactive':
+                        row.status = QuestionStatus('active')
+                    elif row.status.value == 'active':
+                        row.status = QuestionStatus('inactive')
 
         self.data.save()
-        return self._tabulate_data(rows)
+        self.print_stats()
 
     def enable(self) -> str:
-        qs_index = self._get_questions_index()
-        rows = []
-        for index in qs_index:
-            self.data.db[index]['active'] = True
-            rows.append(self.data.db[index])
-
+        for row in self.data.db:
+            for id in self.ids:
+                if row.id == id:
+                    if row.status.value == 'inactive':
+                        row.status = QuestionStatus('active')
         self.data.save()
-        return self._tabulate_data(rows)
+        self.print_stats()
 
     def disable(self) -> str:
-        qs_index = self._get_questions_index()
-        rows = []
-        for index in qs_index:
-            self.data.db[index]['active'] = False
-            rows.append(self.data.db[index])
-
+        for row in self.data.db:
+            for id in self.ids:
+                if row.id == id:
+                    if row.status.value == 'active':
+                        row.status = QuestionStatus('inactive')
         self.data.save()
-        return self._tabulate_data(rows)
+        self.print_stats()
 
     def update(self):
         # <question>;<multiple answer options>;<true answer>
         # input example: Whats your question?;One, Two answer;Correct answer
-        qs_index = self._get_questions_index()
 
-        rows = []
+        for id in self.ids:
+            for row in self.data.db:
+                if row.id == id:
+                    self.print_stats([row])
 
-        for index in qs_index:
-            row = self.data.db[index]
+                    qu = input('Your question;answer;choices;type: ').strip().split(';')
 
-            print(self._tabulate_data([row]))
+                    choices = [ch.strip() for ch in qu[2].split(',')]
+                    choices = list(filter(None, choices))  # remove empties
 
-            question = input('Your question: ')
-            question = question.split(';')
+                    row.definition = qu[0]
+                    row.answer = qu[1]
+                    row.choices = choices
+                    row.type = QuestionType(qu[3])
 
-            row['question'] = question[0]
-            row['choices'] = question[1]
-            row['answer'] = question[2]
-
-            rows.append(row)
+                    print(len(row.choices), row.choices)
+                    if len(row.choices) == 0 and row.type.value == 'quiz':
+                        msg = 'Type is selected as quiz, but no choices added.'
+                        raise ValueError(msg)
 
         self.data.save()
-        return self._tabulate_data(rows)
+        self.print_stats()
 
     def remove(self):
         indexes = self._get_questions_index()
@@ -420,24 +371,9 @@ class Question:
 
         self.data.save()
 
-    def status(self) -> str:
-        """
-        Show grid with questions and their status
-        """
-        for row in self.data.db:
-            if row['correct'] == 0:
-                row['correct'] = '0%'
-            else:
-                row['correct'] = \
-                    f'{row["correct"] / row["times_shown"] * 100:.0f}%'
-
-        table = tabulate(
-            self.data.db,
-            headers='keys',
-            tablefmt='rounded_grid',
-            colalign=('right', 'center', 'right')
-        )
-        return table
+    def reset_db(self):
+        self.data.db = []
+        self.data.save()
 
 
 def init_logging(filename):
@@ -473,7 +409,7 @@ def main():
     init_logging(results_name)
 
     data = Data(filename=db_name)
-    q = Question(args['<id>'], data)
+    q = Quiz(args['<id>'], data)
 
     # Practice
     if args['practice']:
@@ -491,30 +427,29 @@ def main():
     elif args['question']:
         if args['<id>']:
             if args['toggle']:
-                print(q.toggle_status())
+                q.toggle_status()
             elif args['disable']:
-                print(q.disable())
+                q.disable()
             elif args['enable']:
-                print(q.enable())
+                q.enable()
             elif args['update']:
-                print(q.update())
+                q.update()
             elif args['reset']:
-                print(q.reset())
+                q.reset()
             elif args['remove']:
                 q.remove()
             elif args['stats']:
-                print(q.stats())
+                q.print_stats()
         elif args['add']:
-            # print(q.add(args['--add']))
-            print(q.add())
+            q.add()
         elif args['reset-all']:
             q.reset_all()
         else:
-            print(q.status())
+            q.status()
     elif args['reset']:
-        q.reset()
+        q.reset_db()
     elif args['stats']:
-        print(q.status())
+        q.print_stats(all=True)
 
 
 if __name__ == '__main__':
@@ -526,12 +461,8 @@ if __name__ == '__main__':
 """
 TODO:
 3. Add confirmation dialog, e.g. do you really want to reset all questions? yN
-4. Create class Question with __iter__ method
-    https://dev.to/htv2012/how-to-write-a-class-object-to-csv-5be1
 - The user should not be able to enter practice or test modes until at least 5
   questions have been added.
 - double-check if disabled questions are shown in practice and test
 - unit tests: at least 3
-- add option to remove all questions?
-
 """
