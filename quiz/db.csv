@@ -1,0 +1,21 @@
+id,definition,answer,choices,status,type,correct,times_shown
+1,How many original James Bond novels were published?,12,"21, 15",inactive,quiz,4,4
+2,Who wrote the epic poem Paradise Lost?,John Milton,"Williams Shakespeare, Mary Shelley",inactive,quiz,3,10
+3,“Magnum opus” is a Latin phrase for what in literature?,An author’s best work,"A love story, A tragedy",inactive,quiz,3,4
+4,Who wrote Lolita?,Vladimir Nabokov,"Anton Chekov, Leo Tolstoy",inactive,quiz,3,8
+6,How many novels did Roald Dahl write?,19,"Seven, 11",inactive,quiz,5,12
+7,Where is Emily Bronte's novel Wuthering Heights set?,Yorkshire,"London, Paris",inactive,quiz,1,9
+8,"Bestselling female author of all time, having sold two billion books?",Agatha Christie,"Enid Blyton, JK Rowling",inactive,quiz,4,10
+10,Who is the female protagonist in The Hunger Games?,Katniss Everdeen,"Hermione Granger, Nancy Drew",inactive,quiz,6,9
+11,What is the most southerly capital city in the world?,Wellington,,inactive,freeform,0,14
+12,What is the capital of China?,Beijing,,inactive,freeform,0,7
+13,What is the capital of Afghanistan?,Kabul,,inactive,freeform,0,10
+14,ork was the capital of Roman Britain. True or false?,True,,inactive,freeform,0,6
+15,What is the capital of Ukraine?,Kyiv,,inactive,freeform,1,29
+16,What is the capital of Argentina?,Buenos Aires,,inactive,freeform,0,7
+17,"On which continent would you find the capitals Algiers, Dijibouti and Aacra?",Africa,,inactive,freeform,1,7
+18,What is the capital of Canada?,Ottawa,,inactive,freeform,0,3
+19,What is the capital of the Republic of Ireland?,Dublin,,inactive,freeform,0,5
+20,Which river flows through 4 major European capital cities?,The River Danube,,inactive,freeform,0,3
+21,What name?,VJ,"Tom, John",inactive,quiz,6,14
+21,What?,no,,active,freeform,0,0
