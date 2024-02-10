@@ -49,13 +49,13 @@ import copy
 import logging
 import random
 import time
-import sys
 
 from tabulate import tabulate
 
 from tools.data import Data, Question, QuestionStatus, QuestionType
 from tools.questions import ModifyQuestion
 from tools.docopt import docopt
+from tools.utilities import query_yes_no, logger
 
 
 class Quiz:
@@ -372,27 +372,9 @@ class Quiz:
         self.data.save()
 
     def reset_db(self):
-        self.data.db = []
-        self.data.save()
-
-
-def init_logging(filename):
-    '''
-    Logs messages to file and stdout. Both use different formatting.
-    '''
-    cli_formatter = logging.Formatter('%(message)s')
-    std_formatter = logging.Formatter('%(asctime)s %(message)s',
-                                      datefmt='%Y-%m-%d %H:%M:%S')
-    rootLogger = logging.getLogger()
-    rootLogger.setLevel(logging.DEBUG)
-
-    file_handler = logging.FileHandler(filename)
-    file_handler.setFormatter(std_formatter)
-    rootLogger.addHandler(file_handler)
-
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(cli_formatter)
-    rootLogger.addHandler(console_handler)
+        if query_yes_no('Do you really want to delete all the questions?'):
+            self.data.db = []
+            self.data.save()
 
 
 def main():
@@ -401,12 +383,11 @@ def main():
     results_name = 'results.txt'
     if args['--results']:
         results_name = args['--results']
+    logger(results_name)
 
     db_name = 'db1.csv'
     if args['--db']:
         db_name = args['--db']
-
-    init_logging(results_name)
 
     data = Data(filename=db_name)
     q = Quiz(args['<id>'], data)
@@ -417,12 +398,14 @@ def main():
             q.practice(args['--mode'])
         else:
             q.practice()
+
     # Test
     elif args['test']:
         if args['--limit'] or args['--mode']:
             q.test(args['--limit'], args['--mode'])
         else:
             q.test()
+
     # Questions manipulation
     elif args['question']:
         if args['<id>']:
@@ -457,12 +440,3 @@ if __name__ == '__main__':
 
 # Link to the public GitHub repo tha contains my work from Part 3:
 # TODO: https://github.com/viliusddd/turing/
-
-"""
-TODO:
-3. Add confirmation dialog, e.g. do you really want to reset all questions? yN
-- The user should not be able to enter practice or test modes until at least 5
-  questions have been added.
-- double-check if disabled questions are shown in practice and test
-- unit tests: at least 3
-"""
