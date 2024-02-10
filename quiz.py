@@ -13,7 +13,7 @@ Usage:
   quiz.py question (reset-all|add)
 
 Try:
-  quiz.py test --limit 10 --mode typing
+  quiz.py test --limit 10 --mode freeform
   quiz.py practice
   quiz.py stats
   quiz.py question add
@@ -22,37 +22,41 @@ Try:
 
 Commands:
   test                  Test against limited number of questions. Results
-                        are saved to file.
+                        are saved to the file.
   practice              Practice against unlimited number of questions
-                        until you cancel it.
-  question              Edit existing questions by supplying ids, or add
+                        until you cancel it with Ctrl-D or Ctrl-C.
+  question              Edit existing questions by supplying id(s), or add
                         a new one.
   stats                 Show statistics of all questions.
-  reset                 Remove all questions
+  reset                 Remove all questions.
 
 Options:
   -h --help             Show this screen.
-  --results=<file>      Change default test results file. [default: results.txt]
-  --db=<db_file>        Change default db for questions and stats. [default: db.csv]
+  --results=<file>      Change testresults filepath. [default: results.txt]
+  --db=<db_file>        Change db filepath.
 
 Test and Practice:
   -l --limit=<amount>   Number of test questions to run. [default: 5].
-  -m --mode=<mode>      One of modes: typing, choosing, mixed. [default: mixed].
+  -m --mode=<mode>      One of modes: freeform, quiz or mixed. [default: mixed].
 
 Question:
   stats                 Show question(s) statistics.
   toggle                Toggle question(s) status from active to inactive or
-                        the other way around.
-  enable                Change question(s) status to active
-  disable               Change question(s) status to inactive
-  update                Update existing question(s) definition, answer,
-                        choices, type.
-  add                   Add new question.
+                        vice versa.
+  enable                Change question(s) status to active.
+  disable               Change question(s) status to inactive.
+  add                   Add new question. Command prompt is used for use input.
+                        The template for user input: <question>;<answer>;<choices>;<type>.
+                        <choices> is left empty if question type is freeform.
+                        <type> can be only 'freeform' or 'quiz'
+                        Examples: Lithuania capital?;Vilnius;;freeform
+                                  Latvia capital?;Riga;Warsaw,Vilnius, Talin;quiz
+  update                Update existing question(s). Refer to `add` for example.
   remove                Remove question(s) from db.
   reset                 Reset question(s) statistics.
 
 Arguments:
-  <id>                  Id of question from the database/csv.
+  <id>                  Existing dd of question from the database/csv.
 '''
 import copy
 import logging
@@ -68,12 +72,28 @@ from tools.utilities import query_yes_no, logger
 
 
 class Quiz:
-    def __init__(self, qids, data):
+    '''
+    A class to do quizing and question(s) manipulation.
+
+    Attributes:
+        qids (str): single or multipe question ids.
+        data (Data): object responsible for read/write operations to db.
+    '''
+    def __init__(self, qids, data) -> None:
         self.data = data
         self.qids = qids or None
         self.ids = self._split_question_ids() if qids else None
 
     def _split_question_ids(self) -> list:
+        '''Convert str of ids to list.
+
+        Raises:
+            ValueError: if value is not number(s) and/or can't be split
+                        or id(s) not on db.
+
+        Returns:
+            list: of question ids, e.g.: [3] or [1,3,5,6]
+        '''
         if self.qids.isdigit():
             qids = [int(self.qids)]
         elif ',' in self.qids:
@@ -84,28 +104,46 @@ class Quiz:
             qids = list(range(int(qid1), int(qid2) + 1))
         else:
             raise ValueError('Wrong question id or or ids range.')
+
+        all_ids = [row.id for row in self.data.db]
+        missing_ids = [str(id) for id in qids if id not in all_ids]
+
+        if missing_ids:
+            raise ValueError(
+                f'Some ids aren\'t found in db: {", ".join(missing_ids)}'
+            )
         return qids
 
     def _get_questions_index(self) -> list:
-        qids = self._split_question_ids()
+        '''
+        Changes ids to indexes of questions in db.
 
+        Returns:
+            list: of indexes, e.g. [2] or [3, 4, 5]
+        '''
         indexes = []
-        for qid in qids:
+        for qid in self.ids:
             for i, row in enumerate(self.data.db):
                 if qid == row.id:
                     indexes.append(i)
+        print(indexes)
         return indexes
 
-    def _filter_by_mode(self, mode='mixed'):
+    def _filter_by_mode(self, mode: str = 'mixed') -> list:
         '''
-        There are 3 testing/practicing modes:
-          - choosing: if mode is set to 'choosing' then user will only
-                      get questions that have multiple choices;
-          - typing: only questions that have answer but no multiple
-                    choices;
-          - mixed: user gets both types of questions and will need to
-                   either type answer or choose a letter from multiple
-                   choices.
+        There are 3 modes in testing and practicing: quiz, freeform and
+        mixed. Depending on the user choice either of those will be
+        returned.
+
+        Args:
+            mode (str, optional): quiz, freeform or mixed.
+                                  Defaults to 'mixed'.
+
+        Raises:
+            TypeError: if neiter of three modes where typed.
+
+        Returns:
+            list: of Question objects.
         '''
         new_rows = []
 
@@ -113,24 +151,40 @@ class Quiz:
             if row.status.value == 'active':
                 if mode == 'mixed':
                     new_rows = self.data.db
-                elif mode == 'typing':
-                    if row.choices == '':
+                elif mode == 'freeform':
+                    if row.type.value == 'freeform':
                         new_rows.append(row)
-                elif mode == 'choosing':
-                    if row.choices != '':
+                elif mode == 'quiz':
+                    if row.type.value == 'quiz':
                         new_rows.append(row)
                 else:
                     raise TypeError('Chosen the wrong answering mode')
 
         return new_rows
 
-    def _typing_input(self):
+    def _freeform_input(self) -> str:
+        '''
+        User input to freeform question.
+
+        Returns:
+            str: user answer to freeform question.
+        '''
         while True:
             user_answer = input('Your answer: ')
             if user_answer:
                 return user_answer
 
-    def _choosing_input(self, row):
+    def _quiz_input(self, row: Question) -> str:
+        '''
+        Gets and validates user input against available choices for
+        that particular question.
+
+        Args:
+            row (Question): object containing question attributes.
+
+        Returns:
+            str: user answer to question, e.g. 'Dublin'
+        '''
         abc = ['A', 'B', 'C', 'D', 'E', 'F']
 
         choices = row.choices
@@ -151,7 +205,15 @@ class Quiz:
             if user_letter.upper() in abc[:len(choices)]:
                 return choices[user_letter.upper()]
 
-    def _user_input(self, rows, limited=False):
+    def _run_testing(self, rows: list, limited: bool = False) -> None:
+        '''
+        Gives user questions indefinitely or until limit is reached.
+
+        Args:
+            rows (list): of Question objects
+            limited (bool, optional): if test/practice have limit of
+                                      questions. Defaults to False.
+        '''
         user_stats = {'correct': 0, 'total': 0, 'duration': ''}
         start_time = time.time()
 
@@ -164,9 +226,9 @@ class Quiz:
                     print(f'{num}. {row.definition}')
 
                     if row.choices:
-                        user_answer = self._choosing_input(row)
+                        user_answer = self._quiz_input(row)
                     else:
-                        user_answer = self._typing_input()
+                        user_answer = self._freeform_input()
 
                     if user_answer == row.answer:
                         print('Success! Your answer is correct!')
@@ -193,7 +255,19 @@ class Quiz:
 
         self._user_stats_msg(user_stats)
 
-    def _user_stats_msg(self, stats: dict):
+    def _user_stats_msg(self, stats: dict) -> None:
+        '''
+        Print user test statistics to terminal. Test statistics are also
+        outputed to file with.
+
+        Args:
+            stats (dict): of statistics, e.g.:
+                          {
+                            'correct': 1,
+                            'total': 6,
+                            'duration': 14.929275274276733
+                          }
+        '''
         total = f'{stats["correct"]}/{stats["total"]}'
         total_perc = f'{stats["correct"] / stats["total"] * 100:.0f}%'
 
@@ -204,7 +278,17 @@ class Quiz:
             f'{total_perc} ({total}) correct answers. Test took {duration}'
         )
 
-    def _weighted_choices(self, rows):
+    def _weighted_choices(self, rows: list) -> list:
+        '''
+        Selects random questions from list by the probability of it.
+        Questions with lower success rate will show-up more often.
+
+        Args:
+            rows (list): of Question objects.
+
+        Returns:
+            list: of Question objects that has weighted random choice applied.
+        '''
         weights = []
         for row in rows:
             if row.correct == 0:
@@ -219,7 +303,19 @@ class Quiz:
         rows = random.choices(rows, weights=weights, k=(int(len(rows))))
         return rows
 
-    def test(self, amount=5, answer_mode='mixed'):
+    def test(self, amount: int = 5, answer_mode: str = 'mixed') -> None:
+        '''
+        Test user for a limited amount of questions.
+
+        Args:
+            amount (int, optional): amount of questions to test against.
+                                    Defaults to 5.
+            answer_mode (str, optional): either quiz, freeform or mixed.
+                                         Defaults to 'mixed'.
+        Raises:
+            ValueError: the number of questions in db that matches
+                        parameters is lower than requested.
+        '''
         amount = int(amount)
 
         # if amount < 5:
@@ -229,25 +325,37 @@ class Quiz:
         rows = random.sample(rows, amount)
 
         if amount > len(rows):
-            raise ValueError(f'Required amount is lower than \
-                             available questions. {amount}>{len(rows)}.')
+            raise ValueError('Required amount of questions is lower than '
+                             f'available questions. {amount}>{len(rows)}.')
 
-        self._user_input(rows, limited=True)
+        self._run_testing(rows, limited=True)
 
-    def practice(self, answer_mode='mixed'):
+    def practice(self, answer_mode: str = 'mixed') -> None:
+        '''Practice on questions that might repeat until exit.
+
+        Args:
+            answer_mode (str, optional): either quiz, freeform or mixed.
+                                         Defaults to 'mixed'.
+        '''
         rows = self._filter_by_mode(mode=answer_mode)
         rows = random.sample(rows, len(rows))
 
-        self._user_input(rows, limited=False)
+        self._run_testing(rows, limited=False)
 
-    def add(self):
-        # question;multiple_choices;correct_answer
-        # if multipple_choices is omited, then it will be treated as
-        # free-form question instead of quiz with multiple choices
+    def add(self) -> None:
+        '''Append new question to the end of db.
 
-        # free-form example: Capital of Poland;;Warsaw
-        # quiz example: Capital of Poland;Vilnius, Riga, Kiev;Warsaw
+        Command prompt is used for use input.
+        The template for user input: <question>;<answer>;<choices>;<type>.
+        <choices> is left empty if question type is freeform.
+        <type> can be only 'freeform' or 'quiz'
+        Examples:
+            Capital of Lithuania?;Vilnius;;freeform
+            Capital of Latvia?;Riga;Warsaw,Vilnius, Talin;quiz
 
+        Raises:
+            ValueError: if <quiz> is typed, but there are no <choices> present.
+        '''
         try:
             last_id = max(row.id for row in self.data.db)
         except ValueError:
@@ -258,7 +366,7 @@ class Quiz:
         print('Example question:\n')
         self.print_stats(preview_row)
 
-        qu = input('Your question;answer;choices;type: ').strip().split(';')
+        qu = input('question;answer;choices;type: ').split(';').strip()
 
         choices = [ch.strip() for ch in qu[2].split(',')]
         choices = list(filter(None, choices))  # remove empties
@@ -278,7 +386,10 @@ class Quiz:
 
         self.print_stats([row])
 
-    def remove(self):
+    def remove(self) -> None:
+        '''
+        Remove question(s).
+        '''
         indexes = self._get_questions_index()
         indexes.sort()
 
@@ -286,12 +397,12 @@ class Quiz:
             if i in indexes:
                 self.data.db.pop(i)
 
-        try:
-            last_id = max(row.id for row in self.data.db)
-        except ValueError:
-            last_id = 0
+        self.data.save()
 
-    def reset(self):
+    def reset(self) -> None:
+        '''
+        Reset question(s) statistics.
+        '''
         for row in self.data.db:
             for id in self.ids:
                 if row.id == id:
@@ -301,13 +412,19 @@ class Quiz:
         self.data.save()
         self.print_stats()
 
-    def reset_all(self):
+    def reset_all(self) -> None:
+        '''
+        Reset all questions statistics.
+        '''
         for row in self.data.db:
             row.correct = 0
             row.times_shown = 0
         self.data.save()
 
-    def toggle_status(self) -> str:
+    def toggle_status(self) -> None:
+        '''
+        Toggle question(s) status from active to inactive and vice versa.
+        '''
         for row in self.data.db:
             for id in self.ids:
                 if row.id == id:
@@ -319,7 +436,10 @@ class Quiz:
         self.data.save()
         self.print_stats()
 
-    def enable(self) -> str:
+    def enable(self) -> None:
+        '''
+        Change question(s) status from inactive to active.
+        '''
         for row in self.data.db:
             for id in self.ids:
                 if row.id == id:
@@ -328,7 +448,10 @@ class Quiz:
         self.data.save()
         self.print_stats()
 
-    def disable(self) -> str:
+    def disable(self) -> None:
+        '''
+        Change question(s) status from active to inactive.
+        '''
         for row in self.data.db:
             for id in self.ids:
                 if row.id == id:
@@ -337,16 +460,26 @@ class Quiz:
         self.data.save()
         self.print_stats()
 
-    def update(self):
-        # <question>;<multiple answer options>;<true answer>
-        # input example: Whats your question?;One, Two answer;Correct answer
+    def update(self) -> None:
+        '''Update existing question(s) definition, answer, choices or type.
 
+        Command prompt is used for use input.
+        The template for user input: <question>;<answer>;<choices>;<type>.
+        <choices> is left empty if question type is freeform.
+        <type> can be only 'freeform' or 'quiz'
+        Examples:
+            Capital of Lithuania?;Vilnius;;freeform
+            Capital of Latvia?;Riga;Warsaw,Vilnius, Talin;quiz
+
+        Raises:
+            ValueError: if <quiz> is typed, but there are no <choices> present.
+        '''
         for id in self.ids:
             for row in self.data.db:
                 if row.id == id:
                     self.print_stats([row])
 
-                    qu = input('Your question;answer;choices;type: ').strip().split(';')
+                    qu = input('question;answer;choices;type: ').split(';').strip()
 
                     choices = [ch.strip() for ch in qu[2].split(',')]
                     choices = list(filter(None, choices))  # remove empties
@@ -360,16 +493,27 @@ class Quiz:
                     if len(row.choices) == 0 and row.type.value == 'quiz':
                         msg = 'Type is selected as quiz, but no choices added.'
                         raise ValueError(msg)
-
         self.data.save()
         self.print_stats()
 
-    def reset_db(self):
+    def reset_db(self) -> None:
+        '''
+        Delete all existing questions.
+        '''
         if query_yes_no('Do you really want to delete all the questions?'):
             self.data.db = []
             self.data.save()
 
-    def print_stats(self, rows: list = None, all=None) -> str:
+    def print_stats(self, rows: list = None, all=None) -> None:
+        '''
+        Output to terminal one or more questions attributes in a
+        tabulated form.
+
+        Args:
+            rows (list, optional): list of Question objects. Defaults to None.
+            all (_type_, optional): if True then all questions are printed.
+                                    Defaults to None.
+        '''
         if all:
             rows = self.data.db
 
@@ -386,9 +530,13 @@ class Quiz:
         if rows:
             print(tabulate(rows, headers='keys', tablefmt='rounded_grid'))
         else:
-            print('The row doesn\'t exist')
+            print('No questions are present in database.')
 
-def main():
+
+def main() -> None:
+    '''
+    Defines interface for cli arguments.
+    '''
     args = docopt(__doc__, version='0.01')
 
     results_name = 'results.txt'
