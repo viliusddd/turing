@@ -150,7 +150,7 @@ class Quiz:
         for row in self.data.db:
             if row.status.value == 'active':
                 if mode == 'mixed':
-                    new_rows = self.data.db
+                    new_rows.append(row)
                 elif mode == 'freeform':
                     if row.type.value == 'freeform':
                         new_rows.append(row)
