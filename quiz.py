@@ -61,6 +61,7 @@ Arguments:
 import copy
 import logging
 import random
+import sys
 import time
 
 from tabulate import tabulate
@@ -317,10 +318,11 @@ class Quiz:
         '''
         amount = int(amount)
 
-        # if amount < 5:
-        #     raise ValueError('At least 5 questions required to start test.')
-
         rows = self._filter_by_mode(mode=answer_mode)
+
+        if len(rows) < 5:
+            sys.exit('At least 5 available questions required to start test.')
+
         rows = random.sample(rows, amount)
 
         if amount > len(rows):
