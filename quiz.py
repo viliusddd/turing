@@ -66,7 +66,6 @@ import time
 from tabulate import tabulate
 
 from tools.data import Data, Question, QuestionStatus, QuestionType
-from tools.questions import ModifyQuestion
 from tools.docopt import docopt
 from tools.utilities import query_yes_no, logger
 
@@ -549,49 +548,49 @@ def main() -> None:
         db_name = args['--db']
 
     data = Data(filename=db_name)
-    q = Quiz(args['<id>'], data)
+    quiz = Quiz(args['<id>'], data)
 
     # Practice
     if args['practice']:
         if args['--mode']:
-            q.practice(args['--mode'])
+            quiz.practice(args['--mode'])
         else:
-            q.practice()
+            quiz.practice()
 
     # Test
     elif args['test']:
         if args['--limit'] or args['--mode']:
-            q.test(args['--limit'], args['--mode'])
+            quiz.test(args['--limit'], args['--mode'])
         else:
-            q.test()
+            quiz.test()
 
     # Questions manipulation
     elif args['question']:
         if args['<id>']:
             if args['toggle']:
-                q.toggle_status()
+                quiz.toggle_status()
             elif args['disable']:
-                q.disable()
+                quiz.disable()
             elif args['enable']:
-                q.enable()
+                quiz.enable()
             elif args['update']:
-                q.update()
+                quiz.update()
             elif args['reset']:
-                q.reset()
+                quiz.reset()
             elif args['remove']:
-                q.remove()
+                quiz.remove()
             elif args['stats']:
-                q.print_stats()
+                quiz.print_stats()
         elif args['add']:
-            q.add()
+            quiz.add()
         elif args['reset-all']:
-            q.reset_all()
+            quiz.reset_all()
         else:
-            q.status()
+            quiz.status()
     elif args['reset']:
-        q.reset_db()
+        quiz.reset_db()
     elif args['stats']:
-        q.print_stats(all=True)
+        quiz.print_stats(all=True)
 
 
 if __name__ == '__main__':
