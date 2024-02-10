@@ -1,6 +1,6 @@
 #! .venv/bin/python
 '''
-TODO: Interactive learning tool that allows users to create, practice,
+Interactive learning tool that allows users to create, practice,
 and test their knowledge using multiple-choice and freeform text
 questions. The program will track user statistics and provide
 options to manage the questions.
@@ -9,7 +9,7 @@ Usage:
   quiz.py (test|practice|question|stats|reset) [--db=<db_file>] [--results=<file>]
   quiz.py test [--limit=<amount>] [--mode=<mode>]
   quiz.py practice [--mode=<mode>]
-  quiz.py question <id> (stats|toggle|enable|disable|update|remove|reset)
+  quiz.py question (stats|toggle|enable|disable|update|remove|reset) <id>
   quiz.py question (reset-all|add)
 
 Try:
@@ -21,29 +21,38 @@ Try:
   quiz.py question toggle 1,6,7
 
 Commands:
-  test                 Test mode
-  practice             Practice mode
-  question             Questions editing mode
-  stats                Show statistics of questions
-  reset                Remove all question
+  test                  Test against limited number of questions. Results
+                        are saved to file.
+  practice              Practice against unlimited number of questions
+                        until you cancel it.
+  question              Edit existing questions by supplying ids, or add
+                        a new one.
+  stats                 Show statistics of all questions.
+  reset                 Remove all questions
 
 Options:
-  -h --help            Show this screen.
-  -a --add             Add question
-  -r --remove          Remove question.
-  --toggle-status      Toggle status of question from active to inactive
-                       and vice versus.
-  -l --limit=<amount>  Number of test questions to run. [default: 5].
-  -m --mode=<mode>     One of modes: typing, choosing, mixed. [default: mixed].
+  -h --help             Show this screen.
+  --results=<file>      Change default test results file. [default: results.txt]
+  --db=<db_file>        Change default db for questions and stats. [default: db.csv]
 
-  -v --verbose         Print verbose output to terminal: Print explanations
-  --reset-all          Reset all questions numbers
-  --results=<file>     Test results log file. [default: results.txt]
-  --db=<db_file>       CSV for questions and stats keeping. [default: db.csv]
+Test and Practice:
+  -l --limit=<amount>   Number of test questions to run. [default: 5].
+  -m --mode=<mode>      One of modes: typing, choosing, mixed. [default: mixed].
+
+Question:
+  stats                 Show question(s) statistics.
+  toggle                Toggle question(s) status from active to inactive or
+                        the other way around.
+  enable                Change question(s) status to active
+  disable               Change question(s) status to inactive
+  update                Update existing question(s) definition, answer,
+                        choices, type.
+  add                   Add new question.
+  remove                Remove question(s) from db.
+  reset                 Reset question(s) statistics.
 
 Arguments:
-  <id>                 Id of question from the database/csv.
-
+  <id>                  Id of question from the database/csv.
 '''
 import copy
 import logging
@@ -63,25 +72,6 @@ class Quiz:
         self.data = data
         self.qids = qids or None
         self.ids = self._split_question_ids() if qids else None
-
-    def print_stats(self, rows: list = None, all=None) -> str:
-        if all:
-            rows = self.data.db
-
-        if not rows:
-            rows = [row for row in self.data.db if row.id in self.ids]
-
-        rows = copy.deepcopy(rows)
-
-        for row in rows:
-            row.choices = ', '.join(row.choices)
-            row.status = row.status.value
-            row.type = row.type.value
-
-        if rows:
-            print(tabulate(rows, headers='keys', tablefmt='rounded_grid'))
-        else:
-            print('The row doesn\'t exist')
 
     def _split_question_ids(self) -> list:
         if self.qids.isdigit():
@@ -134,42 +124,6 @@ class Quiz:
 
         return new_rows
 
-    def weighted_choices(self, rows):
-        weights = []
-        for row in rows:
-            if row.correct == 0:
-                weights.append(9.9)
-            else:
-                ratio = 10 - (row.correct / row.times_shown * 10)
-                weight = round(ratio, 1)
-                if weight == 0:
-                    weight = 0.5
-                weights.append(weight)
-
-        rows = random.choices(rows, weights=weights, k=(int(len(rows))))
-        return rows
-
-    def practice(self, answer_mode='mixed'):
-        rows = self._filter_by_mode(mode=answer_mode)
-        rows = random.sample(rows, len(rows))
-
-        self._user_input(rows, limited=False)
-
-    def test(self, amount=5, answer_mode='mixed'):
-        amount = int(amount)
-
-        # if amount < 5:
-        #     raise ValueError('At least 5 questions required to start test.')
-
-        rows = self._filter_by_mode(mode=answer_mode)
-        rows = random.sample(rows, amount)
-
-        if amount > len(rows):
-            raise ValueError(f'Required amount is lower than \
-                             available questions. {amount}>{len(rows)}.')
-
-        self._user_input(rows, limited=True)
-
     def _typing_input(self):
         while True:
             user_answer = input('Your answer: ')
@@ -205,7 +159,7 @@ class Quiz:
             num = 1
             while True:
                 if not limited:
-                    self.weighted_choices(rows)
+                    self._weighted_choices(rows)
                 for row in rows:
                     print(f'{num}. {row.definition}')
 
@@ -250,6 +204,42 @@ class Quiz:
             f'{total_perc} ({total}) correct answers. Test took {duration}'
         )
 
+    def _weighted_choices(self, rows):
+        weights = []
+        for row in rows:
+            if row.correct == 0:
+                weights.append(9.9)
+            else:
+                ratio = 10 - (row.correct / row.times_shown * 10)
+                weight = round(ratio, 1)
+                if weight == 0:
+                    weight = 0.5
+                weights.append(weight)
+
+        rows = random.choices(rows, weights=weights, k=(int(len(rows))))
+        return rows
+
+    def test(self, amount=5, answer_mode='mixed'):
+        amount = int(amount)
+
+        # if amount < 5:
+        #     raise ValueError('At least 5 questions required to start test.')
+
+        rows = self._filter_by_mode(mode=answer_mode)
+        rows = random.sample(rows, amount)
+
+        if amount > len(rows):
+            raise ValueError(f'Required amount is lower than \
+                             available questions. {amount}>{len(rows)}.')
+
+        self._user_input(rows, limited=True)
+
+    def practice(self, answer_mode='mixed'):
+        rows = self._filter_by_mode(mode=answer_mode)
+        rows = random.sample(rows, len(rows))
+
+        self._user_input(rows, limited=False)
+
     def add(self):
         # question;multiple_choices;correct_answer
         # if multipple_choices is omited, then it will be treated as
@@ -287,6 +277,19 @@ class Quiz:
         self.data.save()
 
         self.print_stats([row])
+
+    def remove(self):
+        indexes = self._get_questions_index()
+        indexes.sort()
+
+        for i, _ in reversed(list(enumerate(self.data.db))):
+            if i in indexes:
+                self.data.db.pop(i)
+
+        try:
+            last_id = max(row.id for row in self.data.db)
+        except ValueError:
+            last_id = 0
 
     def reset(self):
         for row in self.data.db:
@@ -361,21 +364,29 @@ class Quiz:
         self.data.save()
         self.print_stats()
 
-    def remove(self):
-        indexes = self._get_questions_index()
-        indexes.sort()
-
-        for i, _ in reversed(list(enumerate(self.data.db))):
-            if i in indexes:
-                self.data.db.pop(i)
-
-        self.data.save()
-
     def reset_db(self):
         if query_yes_no('Do you really want to delete all the questions?'):
             self.data.db = []
             self.data.save()
 
+    def print_stats(self, rows: list = None, all=None) -> str:
+        if all:
+            rows = self.data.db
+
+        if not rows:
+            rows = [row for row in self.data.db if row.id in self.ids]
+
+        rows = copy.deepcopy(rows)
+
+        for row in rows:
+            row.choices = ', '.join(row.choices)
+            row.status = row.status.value
+            row.type = row.type.value
+
+        if rows:
+            print(tabulate(rows, headers='keys', tablefmt='rounded_grid'))
+        else:
+            print('The row doesn\'t exist')
 
 def main():
     args = docopt(__doc__, version='0.01')
