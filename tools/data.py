@@ -1,11 +1,7 @@
 import csv
-import sys
 
 from enum import Enum
-from pprint import pprint
-
-from dataclasses import dataclass, fields
-from pprint import pprint
+from dataclasses import dataclass
 
 
 class QuestionType(Enum):
@@ -29,10 +25,11 @@ class Question:
     correct: int = 0
     times_shown: int = 0
 
-    def tight_dict(self):
+    def tight_dict(self) -> dict:
         """
-        Usual method of using <class_name>.__dict__ returns 'status'
-        and 'type' values as classes names with values.
+        Returns "cleaned-up" version of dictionary, that
+        Question.__dict__ usually returns. Without classes names
+        in it or unnecessary double qotes or brackets.
         """
         return {
             'id': self.id,
@@ -47,12 +44,18 @@ class Question:
 
 
 class Data:
+    '''
+    Read and write operations to main questions database CSV file.
+    '''
     def __init__(self, filename) -> None:
         self.filename = filename
-        self.db:list = []
+        self.db: list = []
         self.get()
 
-    def get(self):
+    def get(self) -> None:
+        '''
+        Read CSV file and create dataclass object from it.
+        '''
         with open(self.filename) as file:
             for row in csv.DictReader(file):
                 choices = row['choices']
@@ -71,11 +74,10 @@ class Data:
                     times_shown=int(row['times_shown'])
                 ))
 
-    def get_dict(self):
-        ...
-
-    def save(self):
-
+    def save(self) -> None:
+        '''
+        Write whole database to file.
+        '''
         with open(self.filename, 'w') as file:
             fieldnames = ['id', 'definition', 'answer', 'choices',
                           'status', 'type', 'correct', 'times_shown']
@@ -83,7 +85,10 @@ class Data:
             writer.writeheader()
             writer.writerows([i.tight_dict() for i in self.db])
 
-    def save_row(self, new_row):
+    def save_row(self, new_row) -> None:
+        '''
+        Replace existing row with "new" row and save.
+        '''
         for i, row in enumerate(self.db):
             if int(row.id) == int(new_row.id):
                 self.db[i] = new_row
