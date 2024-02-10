@@ -17,5 +17,4 @@ id,definition,answer,choices,status,type,correct,times_shown
 18,What is the capital of Canada?,Ottawa,,inactive,freeform,0,3
 19,What is the capital of the Republic of Ireland?,Dublin,,inactive,freeform,0,5
 20,Which river flows through 4 major European capital cities?,The River Danube,,inactive,freeform,0,3
-21,What name?,VJ,"Tom, John",inactive,quiz,6,14
 21,What?,no,,active,freeform,0,0
