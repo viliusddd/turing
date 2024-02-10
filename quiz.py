@@ -365,7 +365,7 @@ class Quiz:
         print('Example question:\n')
         self.print_stats(preview_row)
 
-        qu = input('question;answer;choices;type: ').split(';').strip()
+        qu = input('question;answer;choices;type: ').strip().split(';')
 
         choices = [ch.strip() for ch in qu[2].split(',')]
         choices = list(filter(None, choices))  # remove empties
@@ -478,7 +478,7 @@ class Quiz:
                 if row.id == id:
                     self.print_stats([row])
 
-                    qu = input('question;answer;choices;type: ').split(';').strip()
+                    qu = input('question;answer;choices;type: ').strip().split(';')
 
                     choices = [ch.strip() for ch in qu[2].split(',')]
                     choices = list(filter(None, choices))  # remove empties
@@ -543,7 +543,7 @@ def main() -> None:
         results_name = args['--results']
     logger(results_name)
 
-    db_name = 'db1.csv'
+    db_name = 'test_db.csv'
     if args['--db']:
         db_name = args['--db']
 
@@ -597,4 +597,4 @@ if __name__ == '__main__':
     main()
 
 # Link to the public GitHub repo tha contains my work from Part 3:
-# TODO: https://github.com/viliusddd/turing/
+# https://github.com/viliusddd/turing/wargame
