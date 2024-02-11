@@ -6,11 +6,11 @@ questions. The program will track user statistics and provide
 options to manage the questions.
 
 Usage:
-  quiz.py (test|practice|question|stats|reset) [--db=<db_file>] [--results=<file>]
-  quiz.py test [--limit=<amount>] [--mode=<mode>]
-  quiz.py practice [--mode=<mode>]
-  quiz.py question (stats|toggle|enable|disable|update|remove|reset) <id>
-  quiz.py question (reset-all|add)
+  quiz.py (test|practice|question|stats) [--db=<db_file>]
+  quiz.py test [--limit=<amount>] [--mode=<mode>] [--results=<file>]
+  quiz.py practice [--mode=<mode>] [--db=<db_file>]
+  quiz.py question (stats|toggle|enable|disable|update|remove|reset) <id> [--db=<db_file>]
+  quiz.py question (add|reset-all|remove-all) [--db=<db_file>]
 
 Try:
   quiz.py test --limit 10 --mode freeform
@@ -28,7 +28,6 @@ Commands:
   question              Edit existing questions by supplying id(s), or add
                         a new one.
   stats                 Show statistics of all questions.
-  reset                 Remove all questions.
 
 Options:
   -h --help             Show this screen.
@@ -36,8 +35,8 @@ Options:
   --db=<db_file>        Change db filepath.
 
 Test and Practice:
-  -l --limit=<amount>   Number of test questions to run. [default: 5].
-  -m --mode=<mode>      One of modes: freeform, quiz or mixed. [default: mixed].
+  -l --limit=<amount>   Number of test questions to run. Default is 5
+  -m --mode=<mode>      One of modes: freeform, quiz or mixed. Default is mixed.
 
 Question:
   stats                 Show question(s) statistics.
@@ -53,7 +52,9 @@ Question:
                                   Latvia capital?;Riga;Warsaw,Vilnius, Talin;quiz
   update                Update existing question(s). Refer to `add` for example.
   remove                Remove question(s) from db.
+  remove-all            Remove all questions from db.
   reset                 Reset question(s) statistics.
+  reset-all             Reset all questions statistics.
 
 Arguments:
   <id>                  Existing dd of question from the database/csv.
@@ -126,7 +127,6 @@ class Quiz:
             for i, row in enumerate(self.data.db):
                 if qid == row.id:
                     indexes.append(i)
-        print(indexes)
         return indexes
 
     def _filter_by_mode(self, mode: str = 'mixed') -> list:
@@ -323,11 +323,11 @@ class Quiz:
         if len(rows) < 5:
             sys.exit('At least 5 available questions required to start test.')
 
-        rows = random.sample(rows, amount)
-
         if amount > len(rows):
             raise ValueError('Required amount of questions is lower than '
                              f'available questions. {amount}>{len(rows)}.')
+
+        rows = random.sample(rows, amount)
 
         self._run_testing(rows, limited=True)
 
@@ -490,7 +490,6 @@ class Quiz:
                     row.choices = choices
                     row.type = QuestionType(qu[3])
 
-                    print(len(row.choices), row.choices)
                     if len(row.choices) == 0 and row.type.value == 'quiz':
                         msg = 'Type is selected as quiz, but no choices added.'
                         raise ValueError(msg)
@@ -545,7 +544,7 @@ def main() -> None:
         results_name = args['--results']
     logger(results_name)
 
-    db_name = 'test_db.csv'
+    db_name = 'db.csv'
     if args['--db']:
         db_name = args['--db']
 
@@ -561,8 +560,12 @@ def main() -> None:
 
     # Test
     elif args['test']:
-        if args['--limit'] or args['--mode']:
-            quiz.test(args['--limit'], args['--mode'])
+        if args['--limit'] and args['--mode']:
+            quiz.test(amount=args['--limit'], answer_mode=args['--mode'])
+        elif args['--limit']:
+            quiz.test(amount=args['--limit'])
+        elif args['--mode']:
+            quiz.test(answer_mode=args['--mode'])
         else:
             quiz.test()
 
@@ -587,10 +590,8 @@ def main() -> None:
             quiz.add()
         elif args['reset-all']:
             quiz.reset_all()
-        else:
-            quiz.status()
-    elif args['reset']:
-        quiz.reset_db()
+        elif args['remove-all']:
+            quiz.reset_db()
     elif args['stats']:
         quiz.print_stats(all=True)
 
