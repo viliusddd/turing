@@ -5,11 +5,11 @@ options to manage the questions.
 
 ```bash
 Usage:
-  quiz.py (test|practice|question|stats|reset) [--db=<db_file>] [--results=<file>]
-  quiz.py test [--limit=<amount>] [--mode=<mode>]
-  quiz.py practice [--mode=<mode>]
-  quiz.py question (stats|toggle|enable|disable|update|remove|reset) <id>
-  quiz.py question (reset-all|add)
+  quiz.py (test|practice|question|stats) [--db=<db_file>]
+  quiz.py test [--limit=<amount>] [--mode=<mode>] [--results=<file>]
+  quiz.py practice [--mode=<mode>] [--db=<db_file>]
+  quiz.py question (stats|toggle|enable|disable|update|remove|reset) <id> [--db=<db_file>]
+  quiz.py question (add|reset-all|remove-all) [--db=<db_file>]
 
 Try:
   quiz.py test --limit 10 --mode freeform
@@ -27,7 +27,6 @@ Commands:
   question              Edit existing questions by supplying id(s), or add
                         a new one.
   stats                 Show statistics of all questions.
-  reset                 Remove all questions.
 
 Options:
   -h --help             Show this screen.
@@ -35,8 +34,8 @@ Options:
   --db=<db_file>        Change db filepath.
 
 Test and Practice:
-  -l --limit=<amount>   Number of test questions to run. [default: 5].
-  -m --mode=<mode>      One of modes: freeform, quiz or mixed. [default: mixed].
+  -l --limit=<amount>   Number of test questions to run. Default is 5
+  -m --mode=<mode>      One of modes: freeform, quiz or mixed. Default is mixed.
 
 Question:
   stats                 Show question(s) statistics.
@@ -52,7 +51,9 @@ Question:
                                   Latvia capital?;Riga;Warsaw,Vilnius, Talin;quiz
   update                Update existing question(s). Refer to `add` for example.
   remove                Remove question(s) from db.
+  remove-all            Remove all questions from db.
   reset                 Reset question(s) statistics.
+  reset-all             Reset all questions statistics.
 
 Arguments:
   <id>                  Existing dd of question from the database/csv.
