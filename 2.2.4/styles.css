@@ -1,0 +1,45 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    align-items: center;
+}
+#grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    background-color: gray;
+
+    /* width: calc(33.333333% - 4px); */
+    /* vertical-align: middle; */
+}
+
+#grid > div {
+    width: 10vh;
+    height: 10vh;
+    cursor: pointer;
+    position: relative;
+    outline: none;
+}
+
+#grid > div:hover {
+    width: 10vh;
+    height: 10vh;
+    background-image: url("./images/x.png");
+    /* background-color: red; */
+    background-size: cover;
+}
+
+.x {
+    background-color: green;
+}
+
+.selected {
+    /* background-color: green; */
+    background-image: url('./images/x.png');
+    background-color: white;
+    background-size: cover;
+}
+.notselected {
+    background-color: white;
+}
